@@ -11,6 +11,8 @@ import { useTranslation } from "react-i18next";
 import useInitHeaderImage from "../../hooks/useInitHeaderImage";
 import HeaderSizePreview from "./HeaderSizePreview";
 
+const { webUtils } = window.require("electron");
+
 export const PDFSettings = () => {
   const [imagePathLoading, setImagePathLoading] = useState(false);
   const [sizePreviewOpen, setSizePreviewOpen] = useState(false);
@@ -68,9 +70,10 @@ export const PDFSettings = () => {
       }
 
       setImagePathLoading(true);
+      const filePath = webUtils.getPathForFile(selectedFile);
       const saveResponse = await send({
         query: "saveHeadImage",
-        file: selectedFile.path,
+        file: filePath,
       });
 
       if (saveResponse.success) {

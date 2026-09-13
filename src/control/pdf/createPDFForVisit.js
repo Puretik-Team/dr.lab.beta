@@ -58,7 +58,7 @@ async function createPDFForVisit({
 
     let headerImgWidth = headerDataUrl ? doc.internal.pageSize.getWidth() : 0;
 
-    const startY = drawHeader(doc, {
+    const headerArgs = {
       logoDataUrl: headerDataUrl,
       headerImgWidth,
       patient: visit?.patient?.name,
@@ -66,7 +66,9 @@ async function createPDFForVisit({
       ageText: visit?.patient?.birth ? calcAgeText(visit.patient.birth) : "-",
       headerEmpty,
       headerHeight,
-    });
+    };
+
+    const startY = drawHeader(doc, headerArgs);
 
     // Add QR code next to patient info only if withQR is true
     const qrEndY = withQR ? addQRCodeToHeader(doc, {
@@ -76,6 +78,13 @@ async function createPDFForVisit({
     }) : startY;
 
     if (watermarkBase64) drawWatermark(doc, { logoBase64: watermarkBase64 });
+
+    // Header/watermark are only drawn on the current page above — redraw
+    // them on every page jspdf-autotable adds while paginating long results.
+    doc.internal.events.subscribe("addPage", () => {
+      drawHeader(doc, headerArgs);
+      if (watermarkBase64) drawWatermark(doc, { logoBase64: watermarkBase64 });
+    });
 
     // Reserve the same top space (header image/blank area) on every page
     // jspdf-autotable creates while paginating a long result list, not just

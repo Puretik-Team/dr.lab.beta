@@ -651,7 +651,7 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
         const { file } = arg;
         fs.copyFile(file, app.getPath("userData") + "/head.png", (err) => {
           if (err) {
-            event.reply("asynchronous-reply", { success: false, err });
+            event.reply("asynchronous-reply", { success: false, error: err.message });
           } else {
             event.reply("asynchronous-reply", { success: true });
           }
