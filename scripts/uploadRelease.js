@@ -20,7 +20,7 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const REGION = "us-east-1";
 const BUCKET = "drlab";
 const HOST = `${BUCKET}.${REGION}.linodeobjects.com`;
-const OS_KEY = "win32"; // matches ${os} in the generic publish url for Windows
+const OS_KEY = "win"; // matches ${os} in the generic publish url for Windows
 const OUT_DIR = process.env.OUT_DIR || path.join(__dirname, "..", "out");
 
 const accessKeyId = process.env.LINODE_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
