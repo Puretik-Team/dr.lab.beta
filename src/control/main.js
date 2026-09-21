@@ -589,6 +589,8 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
           withQR: arg.data.withQR || false,
           headerEmpty: arg.data.headerEmpty || false,
           headerHeight: arg.data.headerHeight || null,
+          footerEmpty: arg.data.footerEmpty || false,
+          footerHeight: arg.data.footerHeight || null,
         });
         event.reply(`asynchronous-reply-${arg.query}`, resp);
       } catch (error) {
@@ -656,6 +658,37 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
             event.reply("asynchronous-reply", { success: true });
           }
         });
+      } catch (error) {
+        event.reply("asynchronous-reply", {
+          success: false,
+          error: error.message,
+        });
+      }
+      break;
+    }
+
+    case "saveFootImage": {
+      try {
+        // Normalize to PNG (jsPDF can't embed webp, and foot.png is read as PNG)
+        await sharp(arg.file)
+          .png()
+          .toFile(path.join(app.getPath("userData"), "foot.png"));
+        event.reply("asynchronous-reply", { success: true });
+      } catch (error) {
+        event.reply("asynchronous-reply", {
+          success: false,
+          error: error.message,
+        });
+      }
+      break;
+    }
+
+    case "removeFootImage": {
+      try {
+        fs.rmSync(path.join(app.getPath("userData"), "foot.png"), {
+          force: true,
+        });
+        event.reply("asynchronous-reply", { success: true });
       } catch (error) {
         event.reply("asynchronous-reply", {
           success: false,

@@ -47,7 +47,13 @@ export const useAppStore = create((set) => ({
   headerHeight: localStorage.getItem("lab-header-height")
     ? parseInt(localStorage.getItem("lab-header-height"), 10)
     : null,
+  footerEmpty: localStorage.getItem("lab-footer-empty") === "true",
+  // null = auto height from the footer image's aspect ratio
+  footerHeight: localStorage.getItem("lab-footer-height")
+    ? parseInt(localStorage.getItem("lab-footer-height"), 10)
+    : null,
   imagePath: null,
+  footImagePath: null,
   setImagePath: (imagePath) => set({ imagePath }),
   setIsOnline: (isOnline) => set({ isOnline }),
   setUser: (user) => set({ user }),
@@ -55,6 +61,9 @@ export const useAppStore = create((set) => ({
   setAutoRefreshSeconds: (autoRefreshSeconds) => set({ autoRefreshSeconds }),
   setHeaderEmpty: (headerEmpty) => set({ headerEmpty }),
   setHeaderHeight: (headerHeight) => set({ headerHeight }),
+  setFooterEmpty: (footerEmpty) => set({ footerEmpty }),
+  setFooterHeight: (footerHeight) => set({ footerHeight }),
+  setFootImagePath: (footImagePath) => set({ footImagePath }),
   setLink: (link) => set({ link }),
   setIsReload: (isReload) => set({ isReload }),
   setIsLogin: (isLogin) => set({ isLogin }),

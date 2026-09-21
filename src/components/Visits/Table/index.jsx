@@ -139,6 +139,10 @@ export const PureTable = ({
       const headerHeight = localStorage.getItem("lab-header-height")
         ? parseInt(localStorage.getItem("lab-header-height"), 10)
         : null;
+      const footerEmpty = localStorage.getItem("lab-footer-empty") === "true";
+      const footerHeight = localStorage.getItem("lab-footer-height")
+        ? parseInt(localStorage.getItem("lab-footer-height"), 10)
+        : null;
 
       const { success, file } = await send({
         query: "printVisit",
@@ -150,6 +154,8 @@ export const PureTable = ({
           withQR: sendWithQR,
           headerEmpty,
           headerHeight,
+          footerEmpty,
+          footerHeight,
         },
       });
 

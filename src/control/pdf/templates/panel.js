@@ -39,6 +39,7 @@ function renderPanel(doc, yStart, item, pdfConfig = PDF_CFG) {
       left: pdfConfig.margin.left,
       right: pdfConfig.margin.right,
       top: pdfConfig.margin.top,
+      bottom: pdfConfig.margin.bottom,
     },
     tableWidth: "auto",
   });

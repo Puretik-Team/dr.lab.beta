@@ -12,14 +12,18 @@ const PREVIEW_H = Math.round((PREVIEW_W * PAGE_H_MM) / PAGE_W_MM);
 const MIN_HEIGHT = 5;
 const MAX_HEIGHT = 120;
 
+// kind: "Header" (zone at the top of the page) or "Footer" (zone at the bottom).
+// Drives the i18n keys (e.g. HeaderSizeTip1 / FooterSizeTip1) and the layout.
 const HeaderSizePreview = ({
   open,
   onClose,
+  kind = "Header",
   headerEmpty,
   headerHeight,
   onChangeHeight,
 }) => {
   const { t } = useTranslation();
+  const isFooter = kind === "Footer";
 
   const effectiveHeight = headerHeight ?? 30; // illustrate "Auto" with a sane default
   const headerPx = Math.min(
@@ -32,13 +36,13 @@ const HeaderSizePreview = ({
       open={open}
       onCancel={onClose}
       onOk={onClose}
-      title={t("HeaderSizePreviewTitle")}
+      title={t(`${kind}SizePreviewTitle`)}
       okText={t("Done")}
       cancelButtonProps={{ style: { display: "none" } }}
       width={420}
     >
       <Text type="secondary" className="text-[13px]">
-        {t("HeaderSizePreviewDesc")}
+        {t(`${kind}SizePreviewDesc`)}
       </Text>
 
       <div className="flex justify-center my-4">
@@ -51,13 +55,16 @@ const HeaderSizePreview = ({
             borderRadius: 4,
             overflow: "hidden",
             background: "#fff",
+            display: "flex",
+            flexDirection: isFooter ? "column-reverse" : "column",
             boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
           }}
         >
-          {/* Header zone */}
+          {/* Header / footer zone */}
           <div
             style={{
               height: headerPx,
+              flexShrink: 0,
               background: headerEmpty
                 ? "repeating-linear-gradient(45deg, #f5f5f5, #f5f5f5 4px, #eaeaea 4px, #eaeaea 8px)"
                 : "#7c5cff",
@@ -70,13 +77,13 @@ const HeaderSizePreview = ({
           >
             {!headerEmpty && (
               <span style={{ color: "#fff", fontSize: 9 }}>
-                {t("HeaderImage")}
+                {t(isFooter ? "FooterImageLabel" : "HeaderImage")}
               </span>
             )}
           </div>
 
           {/* Content zone */}
-          <div style={{ padding: "4px 6px" }}>
+          <div style={{ padding: "4px 6px", flex: 1 }}>
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
@@ -95,7 +102,7 @@ const HeaderSizePreview = ({
           <div
             style={{
               position: "absolute",
-              top: 0,
+              ...(isFooter ? { bottom: 0 } : { top: 0 }),
               right: 2,
               fontSize: 8,
               color: "#999",
@@ -127,9 +134,9 @@ const HeaderSizePreview = ({
       </div>
 
       <ul className="text-[12px] mt-3 pl-4" style={{ color: "#888" }}>
-        <li>{t("HeaderSizeTip1")}</li>
-        <li>{t("HeaderSizeTip2")}</li>
-        <li>{t("HeaderSizeTip3")}</li>
+        <li>{t(`${kind}SizeTip1`)}</li>
+        <li>{t(`${kind}SizeTip2`)}</li>
+        <li>{t(`${kind}SizeTip3`)}</li>
       </ul>
     </Modal>
   );

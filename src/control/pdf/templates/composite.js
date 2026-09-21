@@ -10,9 +10,12 @@ function renderComposite(doc, yStart, item, pdfConfig = PDF_CFG) {
   // 👉 أضف عنوان رئيسي للتحليل نفسه
   const title = item.name_en || item.name_ar || item.code;
   if (title) {
-    doc.setFont(pdfConfig.font.family, "bold");
+    // Frutiger is registered as "normal" only — asking for "bold" makes jsPDF
+    // silently fall back to Times, which garbles Arabic and leaks into later text.
+    doc.setFont(pdfConfig.font.family, "normal");
     doc.setFontSize(pdfConfig.font.size + 1);
     doc.text(title, pdfConfig.margin.left, y);
+    doc.setFontSize(pdfConfig.font.size);
     y += 4; // مسافة بعد العنوان
   }
 
@@ -48,6 +51,7 @@ function renderComposite(doc, yStart, item, pdfConfig = PDF_CFG) {
         left: pdfConfig.margin.left,
         right: pdfConfig.margin.right,
         top: pdfConfig.margin.top,
+        bottom: pdfConfig.margin.bottom,
       },
       tableWidth: "auto",
     });

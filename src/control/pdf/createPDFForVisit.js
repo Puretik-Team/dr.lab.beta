@@ -6,7 +6,11 @@ const bwipjs = require("bwip-js");
 const { PDF_CFG, getPDFConfig } = require("./config");
 const { addFontIfNeeded } = require("./utils");
 const { drawHeader, addQRCodeToHeader } = require("./header");
-const { drawFooterWithPagination } = require("./footer");
+const {
+  drawFooterWithPagination,
+  getFooterMetrics,
+  getFooterReserve,
+} = require("./footer");
 const { drawWatermark } = require("./watermark");
 
 const { renderSingle } = require("./templates/single");
@@ -24,6 +28,8 @@ async function createPDFForVisit({
   withQR = false,
   headerEmpty = false,
   headerHeight = null,
+  footerEmpty = false,
+  footerHeight = null,
 }) {
   const { app, shell } = electron || {};
   try {
@@ -82,16 +88,27 @@ async function createPDFForVisit({
     // Header/watermark are only drawn on the current page above — redraw
     // them on every page jspdf-autotable adds while paginating long results.
     doc.internal.events.subscribe("addPage", () => {
+      // Restore font/size so the redraw doesn't change what the table continues with.
+      const prevFont = doc.getFont();
+      const prevSize = doc.getFontSize();
       drawHeader(doc, headerArgs);
       if (watermarkBase64) drawWatermark(doc, { logoBase64: watermarkBase64 });
+      doc.setFont(prevFont.fontName, prevFont.fontStyle);
+      doc.setFontSize(prevSize);
     });
 
-    // Reserve the same top space (header image/blank area) on every page
-    // jspdf-autotable creates while paginating a long result list, not just
-    // the first one.
+    const footer = getFooterMetrics(doc, { footerEmpty, footerHeight });
+
+    // Reserve the same top space (header image/blank area) and bottom space
+    // (footer image/blank area) on every page jspdf-autotable creates while
+    // paginating a long result list, not just the first one.
     const tableConfig = {
       ...pdfConfig,
-      margin: { ...pdfConfig.margin, top: startY },
+      margin: {
+        ...pdfConfig.margin,
+        top: startY,
+        bottom: getFooterReserve(footer.height),
+      },
     };
 
     let y = Math.max(startY + 6, qrEndY);
@@ -108,7 +125,7 @@ async function createPDFForVisit({
           startY: y,
           head: [["Test", "Value"]],
           body: [[t.name_en || t.code, ""]],
-          margin: { top: startY },
+          margin: { top: startY, bottom: tableConfig.margin.bottom },
         });
         y = doc.lastAutoTable.finalY + 8;
       }
@@ -124,7 +141,7 @@ async function createPDFForVisit({
       }
     }
 
-    drawFooterWithPagination(doc);
+    drawFooterWithPagination(doc, footer);
 
     const filePath = (app ? app.getPath("userData") : ".") + "/visit.pdf";
     await doc.save(filePath);

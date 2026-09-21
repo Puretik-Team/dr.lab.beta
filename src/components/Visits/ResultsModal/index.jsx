@@ -96,6 +96,10 @@ export function ResultsModal({ open, visit, onCancel, onSubmit }) {
       const headerHeight = localStorage.getItem("lab-header-height")
         ? parseInt(localStorage.getItem("lab-header-height"), 10)
         : null;
+      const footerEmpty = localStorage.getItem("lab-footer-empty") === "true";
+      const footerHeight = localStorage.getItem("lab-footer-height")
+        ? parseInt(localStorage.getItem("lab-footer-height"), 10)
+        : null;
 
       const resp = await send({
         query: "printVisit",
@@ -107,6 +111,8 @@ export function ResultsModal({ open, visit, onCancel, onSubmit }) {
           withQR,
           headerEmpty,
           headerHeight,
+          footerEmpty,
+          footerHeight,
         },
       });
 
