@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./style.css";
-import { Button, Card, Divider, InputNumber, message, Select, Spin, Switch } from "antd";
-import { QuestionCircleOutlined } from "@ant-design/icons";
+import { Button, Divider, message, Select, Spin } from "antd";
+import { CheckOutlined } from "@ant-design/icons";
 
 import fileDialog from "file-dialog";
 import { send } from "../../control/renderer";
@@ -9,32 +9,41 @@ import { useAppStore } from "../../libs/appStore";
 import { useTranslation } from "react-i18next";
 
 import useInitHeaderImage from "../../hooks/useInitHeaderImage";
-import HeaderSizePreview from "./HeaderSizePreview";
 
 const { webUtils } = window.require("electron");
 
+// Must match PDF_CFG.brand.purpleTint/purpleDeep in src/control/pdf/config.js
+// — the report's built-in default when the lab hasn't picked a custom color.
+const DEFAULT_TABLE_HEADER_COLOR = "#F5F1FC";
+const DEFAULT_TABLE_HEADER_TEXT_COLOR = "#4E3894";
+
+// Fixed set of {background, text} pairs — every label and the accent line
+// under the header use `text`, so it's always a readable, matching theme
+// rather than just a background swap. First one is the default.
+const TABLE_HEADER_COLOR_PRESETS = [
+  { bg: DEFAULT_TABLE_HEADER_COLOR, text: DEFAULT_TABLE_HEADER_TEXT_COLOR }, // Purple (default)
+  { bg: "#E8F0FE", text: "#1D4ED8" }, // Blue
+  { bg: "#E6F7EC", text: "#1E7A4C" }, // Green
+  { bg: "#FDF3E3", text: "#B4540A" }, // Amber
+  { bg: "#FCEAF0", text: "#B42318" }, // Rose
+  { bg: "#EFEFEF", text: "#404040" }, // Gray
+];
+
 export const PDFSettings = () => {
   const [imagePathLoading, setImagePathLoading] = useState(false);
-  const [sizePreviewOpen, setSizePreviewOpen] = useState(false);
   const [footImageLoading, setFootImageLoading] = useState(false);
-  const [footerPreviewOpen, setFooterPreviewOpen] = useState(false);
 
   const {
-    user,
     setPrintFontSize,
     printFontSize,
     imagePath,
     setImagePath,
-    headerEmpty,
-    setHeaderEmpty,
-    headerHeight,
-    setHeaderHeight,
-    footerEmpty,
-    setFooterEmpty,
-    footerHeight,
-    setFooterHeight,
     footImagePath,
     setFootImagePath,
+    tableHeaderColor,
+    setTableHeaderColor,
+    tableHeaderTextColor,
+    setTableHeaderTextColor,
   } = useAppStore();
 
   const { fetchHeader } = useInitHeaderImage();
@@ -46,33 +55,17 @@ export const PDFSettings = () => {
     setPrintFontSize(val);
   };
 
-  const handleHeaderEmptyChange = (checked) => {
-    localStorage.setItem("lab-header-empty", checked ? "true" : "false");
-    setHeaderEmpty(checked);
-  };
-
-  const handleHeaderHeightChange = (val) => {
-    if (val === null || val === undefined) {
-      localStorage.removeItem("lab-header-height");
-      setHeaderHeight(null);
+  const handleTableHeaderColorChange = ({ bg, text }) => {
+    if (bg === DEFAULT_TABLE_HEADER_COLOR) {
+      localStorage.removeItem("lab-table-header-color");
+      localStorage.removeItem("lab-table-header-text-color");
+      setTableHeaderColor(null);
+      setTableHeaderTextColor(null);
     } else {
-      localStorage.setItem("lab-header-height", val);
-      setHeaderHeight(val);
-    }
-  };
-
-  const handleFooterEmptyChange = (checked) => {
-    localStorage.setItem("lab-footer-empty", checked ? "true" : "false");
-    setFooterEmpty(checked);
-  };
-
-  const handleFooterHeightChange = (val) => {
-    if (val === null || val === undefined) {
-      localStorage.removeItem("lab-footer-height");
-      setFooterHeight(null);
-    } else {
-      localStorage.setItem("lab-footer-height", val);
-      setFooterHeight(val);
+      localStorage.setItem("lab-table-header-color", bg);
+      localStorage.setItem("lab-table-header-text-color", text);
+      setTableHeaderColor(bg);
+      setTableHeaderTextColor(text);
     }
   };
 
@@ -206,39 +199,35 @@ export const PDFSettings = () => {
       </div>
       <Divider />
       <div className="flex justify-between items-center">
-        <b className="text-[12px]">{t("EmptyHeader")}</b>
-        <Switch checked={headerEmpty} onChange={handleHeaderEmptyChange} />
+        <b className="text-[12px]">{t("TableHeaderColor")}</b>
+        <div className="flex items-center gap-2">
+          {TABLE_HEADER_COLOR_PRESETS.map(({ bg, text }) => {
+            const isActive = (tableHeaderColor || DEFAULT_TABLE_HEADER_COLOR) === bg;
+            return (
+              <button
+                key={bg}
+                type="button"
+                title={bg}
+                onClick={() => handleTableHeaderColorChange({ bg, text })}
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: bg,
+                  border: isActive ? `2px solid ${text}` : "1px solid #d9d9d9",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {isActive && <CheckOutlined style={{ fontSize: 10, color: text }} />}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <div className="flex gap-2 items-center mt-2">
-        <b className="text-[12px]">{t("HeaderHeight")}</b>
-        <InputNumber
-          value={headerHeight}
-          onChange={handleHeaderHeightChange}
-          placeholder={t("Auto")}
-          min={5}
-          max={120}
-          addonAfter="mm"
-          size="small"
-          style={{ width: 130 }}
-        />
-        <Button
-          type="text"
-          size="small"
-          icon={<QuestionCircleOutlined />}
-          onClick={() => setSizePreviewOpen(true)}
-        >
-          {t("Preview")}
-        </Button>
-      </div>
-
-      <HeaderSizePreview
-        open={sizePreviewOpen}
-        onClose={() => setSizePreviewOpen(false)}
-        headerEmpty={headerEmpty}
-        headerHeight={headerHeight}
-        onChangeHeight={handleHeaderHeightChange}
-      />
-
       <Divider />
       <div className="flex justify-between items-center">
         <b className="text-[14px]">{t("FooterImage")}</b>
@@ -266,40 +255,6 @@ export const PDFSettings = () => {
           )}
         </Spin>
       </div>
-      <div className="flex justify-between items-center mt-3">
-        <b className="text-[12px]">{t("EmptyFooter")}</b>
-        <Switch checked={footerEmpty} onChange={handleFooterEmptyChange} />
-      </div>
-      <div className="flex gap-2 items-center mt-2">
-        <b className="text-[12px]">{t("FooterHeight")}</b>
-        <InputNumber
-          value={footerHeight}
-          onChange={handleFooterHeightChange}
-          placeholder={t("Auto")}
-          min={5}
-          max={120}
-          addonAfter="mm"
-          size="small"
-          style={{ width: 130 }}
-        />
-        <Button
-          type="text"
-          size="small"
-          icon={<QuestionCircleOutlined />}
-          onClick={() => setFooterPreviewOpen(true)}
-        >
-          {t("Preview")}
-        </Button>
-      </div>
-
-      <HeaderSizePreview
-        kind="Footer"
-        open={footerPreviewOpen}
-        onClose={() => setFooterPreviewOpen(false)}
-        headerEmpty={footerEmpty}
-        headerHeight={footerHeight}
-        onChangeHeight={handleFooterHeightChange}
-      />
     </div>
   );
 };

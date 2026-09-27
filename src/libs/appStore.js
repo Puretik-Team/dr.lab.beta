@@ -52,6 +52,11 @@ export const useAppStore = create((set) => ({
   footerHeight: localStorage.getItem("lab-footer-height")
     ? parseInt(localStorage.getItem("lab-footer-height"), 10)
     : null,
+  // "#RRGGBB" or null — null means "use the report's default purple". Text
+  // and the accent line under the header follow this same paired color, so
+  // Settings always sets both together (see TABLE_HEADER_COLOR_PRESETS).
+  tableHeaderColor: localStorage.getItem("lab-table-header-color") || null,
+  tableHeaderTextColor: localStorage.getItem("lab-table-header-text-color") || null,
   imagePath: null,
   footImagePath: null,
   setImagePath: (imagePath) => set({ imagePath }),
@@ -63,6 +68,8 @@ export const useAppStore = create((set) => ({
   setHeaderHeight: (headerHeight) => set({ headerHeight }),
   setFooterEmpty: (footerEmpty) => set({ footerEmpty }),
   setFooterHeight: (footerHeight) => set({ footerHeight }),
+  setTableHeaderColor: (tableHeaderColor) => set({ tableHeaderColor }),
+  setTableHeaderTextColor: (tableHeaderTextColor) => set({ tableHeaderTextColor }),
   setFootImagePath: (footImagePath) => set({ footImagePath }),
   setLink: (link) => set({ link }),
   setIsReload: (isReload) => set({ isReload }),

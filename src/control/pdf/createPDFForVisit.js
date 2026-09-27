@@ -4,7 +4,7 @@ const dayjs = require("dayjs");
 const bwipjs = require("bwip-js");
 
 const { PDF_CFG, getPDFConfig } = require("./config");
-const { addFontIfNeeded } = require("./utils");
+const { addFontIfNeeded, normalizeGenderCode } = require("./utils");
 const { drawHeader, addQRCodeToHeader } = require("./header");
 const {
   drawFooterWithPagination,
@@ -13,7 +13,7 @@ const {
 } = require("./footer");
 const { drawWatermark } = require("./watermark");
 
-const { renderSingle } = require("./templates/single");
+const { renderSingle, renderSingleGroup } = require("./templates/single");
 const { renderPanel } = require("./templates/panel");
 const { renderComposite } = require("./templates/composite");
 const electron = require("electron");
@@ -30,13 +30,16 @@ async function createPDFForVisit({
   headerHeight = null,
   footerEmpty = false,
   footerHeight = null,
+  labInfo = null,
+  tableHeaderColor = null,
+  tableHeaderTextColor = null,
 }) {
   const { app, shell } = electron || {};
   try {
     // Generate QR code asynchronously only if withQR is true
     const patientId = visit?.patient?.id || visit?.patient_id;
     let qrCodeDataUrl = null;
-    
+
     if (withQR && patientId) {
       try {
         const png = await new Promise((resolve, reject) => {
@@ -58,18 +61,26 @@ async function createPDFForVisit({
       }
     }
 
-    const pdfConfig = getPDFConfig(fontSize);
+    const pdfConfig = getPDFConfig(fontSize, tableHeaderColor, tableHeaderTextColor);
     const doc = new jsPDF(pdfConfig.page);
     addFontIfNeeded(doc, fontSize);
 
     let headerImgWidth = headerDataUrl ? doc.internal.pageSize.getWidth() : 0;
 
+    const createdAt = visit?.createdAt || visit?.created_at;
     const headerArgs = {
       logoDataUrl: headerDataUrl,
       headerImgWidth,
       patient: visit?.patient?.name,
-      dateText: dayjs(visit?.created_at || new Date()).format("YYYY/MM/DD"),
+      dateText: dayjs(createdAt || new Date()).format("YYYY/MM/DD"),
       ageText: visit?.patient?.birth ? calcAgeText(visit.patient.birth) : "-",
+      genderText: translateGender(visit?.patient?.gender),
+      patientId: patientId != null ? `#${patientId}` : "-",
+      patientPhone: visit?.patient?.phone,
+      doctorName: visit?.doctor?.name,
+      sampleDateText: dayjs(createdAt || new Date()).format("YYYY/MM/DD · HH:mm"),
+      reportDateText: dayjs().format("YYYY/MM/DD · HH:mm"),
+      reportNo: visit?.visitNumber || visit?.visit_number,
       headerEmpty,
       headerHeight,
     };
@@ -111,13 +122,17 @@ async function createPDFForVisit({
       },
     };
 
+    const genderCode = normalizeGenderCode(visit?.patient?.gender);
+
     let y = Math.max(startY + 6, qrEndY);
-    const tests = Array.isArray(visit?.tests) ? visit.tests : [];
+    const tests = groupConsecutiveSingles(Array.isArray(visit?.tests) ? visit.tests : []);
     for (let i = 0; i < tests.length; i++) {
       const t = tests[i];
-      if (i > 0) y = (doc.lastAutoTable?.finalY || y) + 10;
-      if (t.type === "single") y = renderSingle(doc, y, t, tableConfig);
-      else if (t.type === "panel") y = renderPanel(doc, y, t, tableConfig);
+      if (i > 0) y = (doc.lastAutoTable?.finalY || y) + 6;
+      if (t.type === "single") y = renderSingle(doc, y, t, tableConfig, genderCode);
+      else if (t.type === "single-group")
+        y = renderSingleGroup(doc, y, t.items, tableConfig, genderCode);
+      else if (t.type === "panel") y = renderPanel(doc, y, t, tableConfig, genderCode);
       else if (t.type === "composite")
         y = renderComposite(doc, y, t, tableConfig);
       else {
@@ -127,21 +142,11 @@ async function createPDFForVisit({
           body: [[t.name_en || t.code, ""]],
           margin: { top: startY, bottom: tableConfig.margin.bottom },
         });
-        y = doc.lastAutoTable.finalY + 8;
-      }
-
-      // 🔹 Divider line after each test (except last one)
-      if (i < tests.length - 1) {
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const lineY = (doc.lastAutoTable?.finalY || y) + 4;
-        // doc.setDrawColor(180); // light gray
-        // doc.setLineWidth(0.2);
-        // doc.line(PDF_CFG.margin.left, lineY, pageWidth - PDF_CFG.margin.right, lineY);
-        y = lineY + 10;
+        y = doc.lastAutoTable.finalY + 6;
       }
     }
 
-    drawFooterWithPagination(doc, footer);
+    drawFooterWithPagination(doc, footer, { labInfo });
 
     const filePath = (app ? app.getPath("userData") : ".") + "/visit.pdf";
     await doc.save(filePath);
@@ -154,11 +159,46 @@ async function createPDFForVisit({
   }
 }
 
+// Consecutive standalone ("single") tests sharing a specimen type get merged
+// into one { type: "single-group", items } so they render as one bar/table
+// instead of a separate bar/table per test — matches how a panel already
+// groups its own rows. Order is preserved; only adjacent runs are merged, so
+// this never reorders anything relative to how the tests were added.
+function groupConsecutiveSingles(tests) {
+  const out = [];
+  for (const t of tests) {
+    const prev = out[out.length - 1];
+    const sameSpecimenSingle =
+      t.type === "single" &&
+      prev &&
+      prev.type === "single-group" &&
+      (prev.items[0]?.sample_type || null) === (t.sample_type || null);
+
+    if (sameSpecimenSingle) {
+      prev.items.push(t);
+    } else if (t.type === "single") {
+      out.push({ type: "single-group", items: [t] });
+    } else {
+      out.push(t);
+    }
+  }
+  // A "group" of exactly one test renders identically to a plain single —
+  // no need to special-case it in the render loop.
+  return out;
+}
+
 function calcAgeText(isoBirth) {
   const b = dayjs(isoBirth);
   if (!b.isValid()) return "-";
   const years = dayjs().diff(b, "year");
   return `${years} سنة`;
+}
+
+function translateGender(g) {
+  const v = String(g || "").trim().toLowerCase();
+  if (v === "male" || v === "m" || v === "ذكر") return "ذكر";
+  if (v === "female" || v === "f" || v === "أنثى") return "أنثى";
+  return g || "-";
 }
 
 module.exports = { createPDFForVisit };

@@ -591,6 +591,9 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
           headerHeight: arg.data.headerHeight || null,
           footerEmpty: arg.data.footerEmpty || false,
           footerHeight: arg.data.footerHeight || null,
+          labInfo: arg.data.labInfo || null,
+          tableHeaderColor: arg.data.tableHeaderColor || null,
+          tableHeaderTextColor: arg.data.tableHeaderTextColor || null,
         });
         event.reply(`asynchronous-reply-${arg.query}`, resp);
       } catch (error) {

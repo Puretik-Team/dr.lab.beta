@@ -1,44 +1,33 @@
-require("jspdf-autotable");
 const { PDF_CFG } = require("../config");
-const { formatRef, getSingleResultRJ } = require("../utils");
+const { formatRef, getSingleResultRJ, getResultStatus } = require("../utils");
+const { renderResultTable } = require("./resultTable");
 
-function renderSingle(doc, yStart, item, pdfConfig = PDF_CFG) {
+function toRow(item, genderCode) {
   const unit = item.unit || "";
-  const refStr = formatRef(item.ref_text, unit);
   const result = getSingleResultRJ(item.result_json);
-
-  doc.autoTable({
-    startY: yStart,
-    theme: "grid",
-    head: [["Test", "Result", "Normal Value"]],
-    body: [
-      [item.name_en || item.name_ar || item.code, `${result} ${unit}`, refStr],
-    ],
-    styles: {
-      font: pdfConfig.font.family,
-      fontSize: pdfConfig.font.size,
-      cellPadding: 3,
-      lineColor: pdfConfig.table.headLine,
-      overflow: "linebreak",
-    },
-    headStyles: {
-      fillColor: pdfConfig.table.headFill,
-      textColor: pdfConfig.table.headText,
-    },
-    bodyStyles: {
-      fillColor: pdfConfig.table.bodyFill,
-      textColor: pdfConfig.table.bodyText,
-    },
-    margin: {
-      left: pdfConfig.margin.left,
-      right: pdfConfig.margin.right,
-      top: pdfConfig.margin.top,
-      bottom: pdfConfig.margin.bottom,
-    },
-    tableWidth: "auto",
-  });
-
-  return doc.lastAutoTable.finalY + 8;
+  return {
+    name: item.name_en || item.name_ar || item.code,
+    result,
+    unit,
+    ref: formatRef(item.ref_text, unit),
+    status: result !== "" ? getResultStatus(item.ref_text, result, genderCode) : null,
+  };
 }
 
-module.exports = { renderSingle };
+function renderSingle(doc, yStart, item, pdfConfig = PDF_CFG, genderCode = null) {
+  return renderResultTable(doc, yStart, { rows: [toRow(item, genderCode)] }, pdfConfig);
+}
+
+// Consecutive standalone tests sharing a specimen don't each need their own
+// table — one table with a row per test reads as one panel instead of a
+// wall of near-identical single-row tables.
+function renderSingleGroup(doc, yStart, items, pdfConfig = PDF_CFG, genderCode = null) {
+  return renderResultTable(
+    doc,
+    yStart,
+    { rows: items.map((it) => toRow(it, genderCode)) },
+    pdfConfig
+  );
+}
+
+module.exports = { renderSingle, renderSingleGroup };

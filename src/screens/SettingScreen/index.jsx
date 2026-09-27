@@ -42,6 +42,7 @@ import { usePlan } from "../../hooks/usePlan";
 import { useAppTheme } from "../../hooks/useAppThem";
 import useInitHeaderImage from "../../hooks/useInitHeaderImage";
 import { PDFSettings } from "./pdfSettings";
+import PDFPreviewCard from "./PDFPreviewCard";
 import useSyncStatus from "../../hooks/useSyncStatus";
 import useLabUsers from "../../hooks/useLabUsers";
 import useCurrentUser from "../../hooks/useCurrentUser";
@@ -559,62 +560,6 @@ const SettingsScreen = () => {
                   <PDFSettings />
                 </Card>
               </div>
-              {/* <div>
-                <p className="pl-[4px] opacity-60">{t("PDFSetting")}</p>
-                <Card className="mt-[6px]">
-                  <div className="flex justify-between items-center">
-                    <b className="text-[14px]">{t("ImageCover")}</b>
-                    <Button type="link" onClick={handleChangeFile}>
-                      {t("ChangeImage")}
-                    </Button>
-                  </div>
-                  <div className="w-full border border-[#eee]  rounded-md overflow-hidden  min-h-[80px] bg-[#f6f6f6]">
-                    {imagePath ? (
-                      <Spin spinning={imagePathLoading}>
-                        <img
-                          className="w-ful"
-                          key={imagePath}
-                          src={imagePath}
-                        />
-                      </Spin>
-                    ) : (
-                      <></>
-                    )}
-                  </div>
-                  <Divider />
-                  <div className="flex justify-between items-center">
-                    <b className="text-[14px]">{t("FontSize")}</b>
-                    <Select
-                      value={printFontSize}
-                      variant="borderless"
-                      onChange={handleSizeChange}
-                      popupMatchSelectWidth={false}
-                      style={{ width: 100, textAlign: "center" }}
-                    >
-                      <Select.Option value={12}>Small</Select.Option>
-                      <Select.Option value={14}>Medium</Select.Option>
-                      <Select.Option value={16}>Large</Select.Option>
-                    </Select>
-                  </div>
-                  <Divider />
-                  <div className="flex justify-between items-center">
-                    <b className="text-[14px]">{t("AutoRefreshInterval")}</b>
-                    <Select
-                      value={autoRefreshSeconds}
-                      variant="borderless"
-                      onChange={handleAutoRefreshChange}
-                      popupMatchSelectWidth={false}
-                      style={{ width: 100, textAlign: "center" }}
-                    >
-                      <Select.Option value={0}>{t("Off")}</Select.Option>
-                      <Select.Option value={60}>1 min</Select.Option>
-                      <Select.Option value={600}>10 min</Select.Option>
-                      <Select.Option value={1800}>30 min</Select.Option>
-                    </Select>
-                  </div>
-                </Card>
-              </div> */}
-
               <div className="mt-[16px]">
                 <p className="pl-[4px]">
                   <span className="opacity-60">{t("DatabaseManagement")}</span>
@@ -766,6 +711,9 @@ const SettingsScreen = () => {
           </Col>
           <Col span={12}>
             <div>
+              <PDFPreviewCard />
+            </div>
+            <div className="mt-[16px]">
               <p className="pl-[4px] opacity-60">{t("SubscriptionInfo")}</p>
               <Card className="mt-[6px]">
                 <div className="flex flex-col w-full gap-[10px]">

@@ -100,6 +100,19 @@ export function ResultsModal({ open, visit, onCancel, onSubmit }) {
       const footerHeight = localStorage.getItem("lab-footer-height")
         ? parseInt(localStorage.getItem("lab-footer-height"), 10)
         : null;
+      const tableHeaderColor = localStorage.getItem("lab-table-header-color") || null;
+      const tableHeaderTextColor = localStorage.getItem("lab-table-header-text-color") || null;
+      let labInfo = null;
+      try {
+        const labUser = JSON.parse(localStorage.getItem("lab-user"));
+        if (labUser) {
+          labInfo = {
+            name: labUser.labName,
+            phone: labUser.phone,
+            address: labUser.address,
+          };
+        }
+      } catch {}
 
       const resp = await send({
         query: "printVisit",
@@ -113,6 +126,9 @@ export function ResultsModal({ open, visit, onCancel, onSubmit }) {
           headerHeight,
           footerEmpty,
           footerHeight,
+          labInfo,
+          tableHeaderColor,
+          tableHeaderTextColor,
         },
       });
 

@@ -62,7 +62,6 @@ function drawFooterWithPagination(doc, footer = { height: 0, dataUrl: null }) {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   doc.setFont(PDF_CFG.font.family, "normal");
-  doc.setFontSize(10);
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
     if (footer.dataUrl && footer.height > 0) {
@@ -75,9 +74,11 @@ function drawFooterWithPagination(doc, footer = { height: 0, dataUrl: null }) {
         footer.height
       );
     }
-    const counterY =
-      footer.height > 0 ? pageHeight - footer.height - 2 : pageHeight - 8;
-    doc.text(`${p} of ${pageCount}`, PDF_CFG.margin.left, counterY, {
+    const baseY = footer.height > 0 ? pageHeight - footer.height - 2 : pageHeight - 8;
+
+    doc.setTextColor(...PDF_CFG.table.bodyText);
+    doc.setFontSize(10);
+    doc.text(`${p} of ${pageCount}`, PDF_CFG.margin.left, baseY, {
       align: "left",
     });
   }
