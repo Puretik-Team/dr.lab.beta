@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from "react";
-import "./style.css";
-import { Button, Divider, message, Select, Spin } from "antd";
+import { Button, message, Select, Spin } from "antd";
 import { CheckOutlined } from "@ant-design/icons";
 
 import fileDialog from "file-dialog";
-import { send } from "../../control/renderer";
-import { useAppStore } from "../../libs/appStore";
+import { send } from "../../../control/renderer";
+import { useAppStore } from "../../../libs/appStore";
 import { useTranslation } from "react-i18next";
 
-import useInitHeaderImage from "../../hooks/useInitHeaderImage";
+import useInitHeaderImage from "../../../hooks/useInitHeaderImage";
 
 const { webUtils } = window.require("electron");
 
@@ -29,7 +28,10 @@ const TABLE_HEADER_COLOR_PRESETS = [
   { bg: "#EFEFEF", text: "#404040" }, // Gray
 ];
 
-export const PDFSettings = () => {
+// The classic "theme": your own header/footer images plus print options.
+// `section` renders one part at a time so the Report Design screen can show
+// them as separate steps: "header" | "footer" | "options".
+export const PDFSettings = ({ section }) => {
   const [imagePathLoading, setImagePathLoading] = useState(false);
   const [footImageLoading, setFootImageLoading] = useState(false);
 
@@ -158,17 +160,27 @@ export const PDFSettings = () => {
     }
   };
 
-  return (
-    <div>
-      <div className="flex justify-between items-center">
-        <b className="text-[14px]">{t("ImageCover")}</b>
-        <Button type="link" onClick={handleChangeFile}>
+  // No section: everything at once (Home screen's setup panel).
+  if (!section)
+    return (
+      <div className="flex flex-col gap-6">
+        <PDFSettings section="header" />
+        <PDFSettings section="options" />
+        <PDFSettings section="footer" />
+      </div>
+    );
+  if (section === "header")
+    return (
+      <div>
+      <div className="flex justify-between items-center mb-3">
+        <b className="text-[16px]">{t("ImageCover")}</b>
+        <Button type="primary" size="large" onClick={handleChangeFile}>
           {t("ChangeImage")}
         </Button>
       </div>
       <div
         className={`w-full border border-[#eee] rounded-md overflow-hidden bg-[#f6f6f6] ${
-          imagePath ? "" : "min-h-[80px]"
+          imagePath ? "" : "min-h-[140px]"
         }`}
       >
         {imagePath ? (
@@ -179,7 +191,41 @@ export const PDFSettings = () => {
           <></>
         )}
       </div>
-      <Divider />
+      </div>
+    );
+  if (section === "footer")
+    return (
+      <div>
+      <div className="flex justify-between items-center mb-3">
+        <b className="text-[16px]">{t("FooterImage")}</b>
+        <div>
+          {footImagePath && (
+            <Button size="large" danger type="text" onClick={handleRemoveFootImage}>
+              {t("RemoveImage")}
+            </Button>
+          )}
+          <Button type="primary" size="large" onClick={handleChangeFootFile}>
+            {t("ChangeImage")}
+          </Button>
+        </div>
+      </div>
+      <div
+        className={`w-full border border-[#eee] rounded-md overflow-hidden bg-[#f6f6f6] ${
+          footImagePath ? "" : "min-h-[100px] flex items-center justify-center"
+        }`}
+      >
+        <Spin spinning={footImageLoading}>
+          {footImagePath ? (
+            <img className="w-full block" key={footImagePath} src={footImagePath} />
+          ) : (
+            <span className="text-[12px] text-[#aaa]">{t("NoFooterImage")}</span>
+          )}
+        </Spin>
+      </div>
+      </div>
+    );
+  return (
+    <div className="flex flex-col gap-6">
       <div className="flex gap-2 items-center">
         <b className="text-[12px]">{t("FontSize")}</b>
         <Select
@@ -197,7 +243,6 @@ export const PDFSettings = () => {
           <Select.Option value={14}>{t("Extra Large")}</Select.Option>
         </Select>
       </div>
-      <Divider />
       <div className="flex justify-between items-center">
         <b className="text-[12px]">{t("TableHeaderColor")}</b>
         <div className="flex items-center gap-2">
@@ -227,33 +272,6 @@ export const PDFSettings = () => {
             );
           })}
         </div>
-      </div>
-      <Divider />
-      <div className="flex justify-between items-center">
-        <b className="text-[14px]">{t("FooterImage")}</b>
-        <div>
-          {footImagePath && (
-            <Button type="link" danger onClick={handleRemoveFootImage}>
-              {t("RemoveImage")}
-            </Button>
-          )}
-          <Button type="link" onClick={handleChangeFootFile}>
-            {t("ChangeImage")}
-          </Button>
-        </div>
-      </div>
-      <div
-        className={`w-full border border-[#eee] rounded-md overflow-hidden bg-[#f6f6f6] ${
-          footImagePath ? "" : "min-h-[50px] flex items-center justify-center"
-        }`}
-      >
-        <Spin spinning={footImageLoading}>
-          {footImagePath ? (
-            <img className="w-full block" key={footImagePath} src={footImagePath} />
-          ) : (
-            <span className="text-[12px] text-[#aaa]">{t("NoFooterImage")}</span>
-          )}
-        </Spin>
       </div>
     </div>
   );

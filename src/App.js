@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
-import { ConfigProvider, theme } from "antd";
+import React, { Suspense, lazy, useEffect } from "react";
+import { ConfigProvider, Spin, theme } from "antd";
 import { Routes, Route } from "react-router-dom";
 import MainContainerV2 from "./components/ContainerV2";
-import PatientsScreen from "./screens/PatientsScreen";
-import TestsScreen from "./screens/TestsScreen";
-import GroupsScreen from "./screens/GroupsScreen";
-import HomeScreen from "./screens/HomeScreen";
-import ReportsScreen from "./screens/ReportsScreen";
+const PatientsScreen = lazy(() => import("./screens/PatientsScreen"));
+const TestsScreen = lazy(() => import("./screens/TestsScreen"));
+const GroupsScreen = lazy(() => import("./screens/GroupsScreen"));
+const HomeScreen = lazy(() => import("./screens/HomeScreen"));
+const ReportsScreen = lazy(() => import("./screens/ReportsScreen"));
 import LoginScreen from "./screens/LoginScreen";
-import SettingsScreen from "./screens/SettingScreen";
+const SettingsScreen = lazy(() => import("./screens/SettingScreen"));
 import TitleBar from "./components/TitleBar/titleBar";
 import useLogin from "./hooks/useLogin";
 import { useAppStore } from "./libs/appStore";
@@ -16,9 +16,10 @@ import { useAppStore } from "./libs/appStore";
 import OTPScreen from "./screens/OTPScreen/Index";
 import { useTranslation } from "react-i18next";
 import { useAppTheme } from "./hooks/useAppThem";
-import DoctorsScreen from "./screens/DoctorsScreen";
+const DoctorsScreen = lazy(() => import("./screens/DoctorsScreen"));
 import { usePlan } from "./hooks/usePlan";
-import VisitsScreen from "./screens/VisitsScreen";
+const VisitsScreen = lazy(() => import("./screens/VisitsScreen"));
+const TemplatesScreen = lazy(() => import("./screens/TemplatesScreen"));
 const { darkAlgorithm, defaultAlgorithm } = theme;
 
 const { ipcRenderer } = window.require("electron");
@@ -88,6 +89,8 @@ function App() {
       {!isLogin && localStorage.getItem("verification_phone") && <OTPScreen />}
       {isLogin && (
         <MainContainerV2>
+          {/* Screens load on first visit instead of all at startup. */}
+          <Suspense fallback={<Spin size="large" className="block mx-auto mt-24" />}>
           <Routes>
             <Route exact path="/" element={<HomeScreen />} />
             <Route exact path="/visits" element={<VisitsScreen />} />
@@ -95,9 +98,11 @@ function App() {
             <Route path="/tests" element={<TestsScreen />} />
             <Route path="/groups" element={<GroupsScreen />} />
             <Route path="/reports" element={<ReportsScreen />} />
+            <Route path="/templates/*" element={<TemplatesScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route path="/doctors" element={<DoctorsScreen />} />
           </Routes>
+          </Suspense>
         </MainContainerV2>
       )}
     </ConfigProvider>

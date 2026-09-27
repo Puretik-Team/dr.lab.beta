@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Card, InputNumber, Modal, Slider, Switch } from "antd";
+import { InputNumber, Modal, Slider, Switch } from "antd";
 import { ExpandOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
-import { useAppStore } from "../../libs/appStore";
+import { useAppStore } from "../../../libs/appStore";
 
 // Same page proportions the report itself uses (src/control/pdf/config.js's
 // page format), so every mm value below maps the same way it does in
@@ -212,7 +212,9 @@ function SizeControls({ label, emptyLabel, empty, onEmptyChange, height, onHeigh
   );
 }
 
-export default function PDFPreviewCard() {
+// controls: "header" | "footer" | "none" — which size controls to show next
+// to the page preview.
+export default function PDFPreviewCard({ controls = "none", previewW = 150 }) {
   const { t } = useTranslation();
   const [zoomOpen, setZoomOpen] = useState(false);
   const {
@@ -290,43 +292,46 @@ export default function PDFPreviewCard() {
 
   return (
     <div>
-      <p className="pl-[4px] opacity-60">{t("PDFPreview")}</p>
-      <Card className="mt-[6px]">
-        <div className="flex gap-5 items-start flex-wrap">
+      <div className="flex gap-6 items-start flex-wrap">
+        <div
+          className="relative group cursor-pointer"
+          onClick={() => setZoomOpen(true)}
+          title={t("ClickToEnlarge")}
+        >
+          <PageMockup previewW={previewW} scale={previewW / 150} {...mockupProps} />
           <div
-            className="relative group cursor-pointer"
-            onClick={() => setZoomOpen(true)}
-            title={t("ClickToEnlarge")}
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ background: "rgba(0,0,0,0.15)" }}
           >
-            <PageMockup previewW={150} scale={1} {...mockupProps} />
-            <div
-              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: "rgba(0,0,0,0.15)" }}
-            >
-              <ExpandOutlined style={{ color: "#fff", fontSize: 20 }} />
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-[220px] flex flex-col gap-4">
-            <SizeControls
-              label={t("HeaderHeight")}
-              emptyLabel={t("EmptyHeader")}
-              empty={headerEmpty}
-              onEmptyChange={handleHeaderEmptyChange}
-              height={headerHeight}
-              onHeightChange={handleHeaderHeightChange}
-            />
-            <SizeControls
-              label={t("FooterHeight")}
-              emptyLabel={t("EmptyFooter")}
-              empty={footerEmpty}
-              onEmptyChange={handleFooterEmptyChange}
-              height={footerHeight}
-              onHeightChange={handleFooterHeightChange}
-            />
+            <ExpandOutlined style={{ color: "#fff", fontSize: 20 }} />
           </div>
         </div>
-      </Card>
+
+        {controls !== "none" && (
+          <div className="flex-1 min-w-[220px] flex flex-col gap-4">
+            {controls === "header" && (
+              <SizeControls
+                label={t("HeaderHeight")}
+                emptyLabel={t("EmptyHeader")}
+                empty={headerEmpty}
+                onEmptyChange={handleHeaderEmptyChange}
+                height={headerHeight}
+                onHeightChange={handleHeaderHeightChange}
+              />
+            )}
+            {controls === "footer" && (
+              <SizeControls
+                label={t("FooterHeight")}
+                emptyLabel={t("EmptyFooter")}
+                empty={footerEmpty}
+                onEmptyChange={handleFooterEmptyChange}
+                height={footerHeight}
+                onHeightChange={handleFooterHeightChange}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       <Modal
         open={zoomOpen}

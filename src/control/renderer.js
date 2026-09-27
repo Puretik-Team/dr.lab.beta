@@ -24,6 +24,12 @@ export function send(doc) {
         "getTopTests",
         "editMetaJson",
         "setSyncConfig",
+        "getReportTemplates",
+        "getReportTemplate",
+        "saveReportTemplate",
+        "deleteReportTemplate",
+        "setDefaultReportTemplate",
+        "exportReportTemplatePDF",
       ].includes(queryName)
         ? `asynchronous-reply-${queryName}`
         : "asynchronous-reply";

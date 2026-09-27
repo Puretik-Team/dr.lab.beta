@@ -19,7 +19,7 @@ import {
 } from "antd";
 import { TbReportSearch } from "react-icons/tb";
 import { GrDocumentTest } from "react-icons/gr";
-import { LuPackage2, LuSettings2 } from "react-icons/lu";
+import { LuPackage2, LuSettings2, LuLayoutTemplate } from "react-icons/lu";
 import { IoMdLogOut } from "react-icons/io";
 import { RxDoubleArrowRight } from "react-icons/rx";
 import { motion } from "framer-motion";
@@ -217,6 +217,12 @@ const MainContainerV2 = ({ children }) => {
                       t("Reports")
                     ),
                   onClick: () => navigate("/reports", { replace: true }),
+                },
+                {
+                  key: "/templates",
+                  icon: <LuLayoutTemplate size={18} />,
+                  label: <p className="text-[15px]">{t("ReportTemplates")}</p>,
+                  onClick: () => navigate("/templates", { replace: true }),
                 },
                 {
                   key: "/settings",

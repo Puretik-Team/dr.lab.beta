@@ -1,4 +1,4 @@
-const { dialog, BrowserWindow, ipcMain, app } = require("electron");
+const { dialog, BrowserWindow, ipcMain, app, shell } = require("electron");
 var { createPDF, printReport } = require("../../initPDF");
 const { machineIdSync } = require("node-machine-id");
 const { LabDB } = require("./db");
@@ -14,6 +14,10 @@ const Jimp = require("jimp");
 const nodeHtmlToImage = require("node-html-to-image");
 const log = require("electron-log");
 const { createPDFForVisit } = require("./pdf/createPDFForVisit");
+const { renderTemplateToPDF } = require("./templates/pdfExporter");
+const { visitToReportData } = require("../templates/reportData");
+const { normalizeTemplate, mergeLabInfo } = require("../templates/schema");
+const { LocalFileData } = require("get-file-object-from-local-path");
 const { sendWhatsApp } = require("./whatsapp");
 const nodemailer = require("nodemailer");
 
@@ -580,6 +584,36 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
           ? getWatermarkBase64()
           : null;
 
+        // A default report template (Report Templates screen) replaces the
+        // classic header-image layout. Same reply shape either way, so the
+        // print / WhatsApp / email callers don't need to know which ran.
+        const defaultTemplate = arg.data.classicLayout
+          ? null
+          : labDB.getDefaultReportTemplate();
+        if (defaultTemplate) {
+          const template = normalizeTemplate(defaultTemplate);
+          const filePath = path.join(app.getPath("userData"), "visit.pdf");
+          const resp = await renderTemplateToPDF({
+            template,
+            data: visitToReportData(
+              arg.data.visit,
+              mergeLabInfo(template, arg.data.labInfo || {}),
+              template.language
+            ),
+            mode: "preview",
+            watermark: watermarkBase64
+              ? { src: `data:image/png;base64,${watermarkBase64}`, opacity: 0.06 }
+              : null,
+            outPath: filePath,
+          });
+          if (resp.success && arg.data.isView) shell.openPath(filePath);
+          event.reply(`asynchronous-reply-${arg.query}`, {
+            ...resp,
+            file: resp.success ? new LocalFileData(filePath) : null,
+          });
+          break;
+        }
+
         const resp = await createPDFForVisit({
           visit: arg.data.visit,
           isView: arg.data.isView,
@@ -598,6 +632,77 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
         event.reply(`asynchronous-reply-${arg.query}`, resp);
       } catch (error) {
         event.reply(`asynchronous-reply-${arg.query}`, {
+          success: false,
+          error: error.message,
+        });
+      }
+      break;
+    }
+
+    // ---------------------------------------------------------------
+    // Report templates
+    // ---------------------------------------------------------------
+    case "getReportTemplates":
+    case "getReportTemplate":
+    case "saveReportTemplate":
+    case "deleteReportTemplate":
+    case "setDefaultReportTemplate": {
+      try {
+        let resp;
+        if (arg.query === "getReportTemplates") resp = labDB.getReportTemplates();
+        else if (arg.query === "getReportTemplate") resp = labDB.getReportTemplate(arg.id);
+        else if (arg.query === "saveReportTemplate") resp = labDB.saveReportTemplate(arg.data);
+        else if (arg.query === "deleteReportTemplate") resp = labDB.deleteReportTemplate(arg.id);
+        else resp = labDB.setDefaultReportTemplate(arg.id || null);
+        event.reply(`asynchronous-reply-${arg.query}`, resp);
+      } catch (error) {
+        log.error(`[TEMPLATE_ERROR] ${arg.query}:`, error.message);
+        event.reply(`asynchronous-reply-${arg.query}`, {
+          success: false,
+          error: error.message,
+        });
+      }
+      break;
+    }
+
+    // data: { template, mode, sampleData?, visit?, labInfo?, openOnly? } —
+    // renders a PDF and opens it (openOnly skips the save dialog).
+    case "exportReportTemplatePDF": {
+      try {
+        const { mode = "preview", sampleData, visit, labInfo, fileName, openOnly } = arg.data || {};
+        const template = normalizeTemplate(arg.data?.template);
+        const win = BrowserWindow.fromWebContents(event.sender);
+        // openOnly: just show the PDF (simple designer's "Show me an example"),
+        // no save dialog.
+        const { canceled, filePath } = openOnly
+          ? { canceled: false, filePath: path.join(app.getPath("userData"), "template-example.pdf") }
+          : await dialog.showSaveDialog(win, {
+          title: "Export PDF",
+          defaultPath: path.join(
+            app.getPath("documents"),
+            `${(fileName || template.name || "template").replace(/[\\/:*?"<>|]+/g, "-")}.pdf`
+          ),
+          filters: [{ name: "PDF", extensions: ["pdf"] }],
+        });
+        if (canceled || !filePath) {
+          event.reply("asynchronous-reply-exportReportTemplatePDF", { success: false, canceled: true });
+          break;
+        }
+        const data =
+          mode === "visit"
+            ? visitToReportData(visit, mergeLabInfo(template, labInfo || {}), template.language)
+            : sampleData || {};
+        const resp = await renderTemplateToPDF({
+          template,
+          data,
+          mode: mode === "blank" ? "blank" : "preview",
+          outPath: filePath,
+        });
+        if (resp.success) shell.openPath(filePath);
+        event.reply("asynchronous-reply-exportReportTemplatePDF", resp);
+      } catch (error) {
+        log.error("[PDF_ERROR] exportReportTemplatePDF:", error.message);
+        event.reply("asynchronous-reply-exportReportTemplatePDF", {
           success: false,
           error: error.message,
         });

@@ -41,8 +41,6 @@ import { leaveLab } from "../../helper/leaveLab";
 import { usePlan } from "../../hooks/usePlan";
 import { useAppTheme } from "../../hooks/useAppThem";
 import useInitHeaderImage from "../../hooks/useInitHeaderImage";
-import { PDFSettings } from "./pdfSettings";
-import PDFPreviewCard from "./PDFPreviewCard";
 import useSyncStatus from "../../hooks/useSyncStatus";
 import useLabUsers from "../../hooks/useLabUsers";
 import useCurrentUser from "../../hooks/useCurrentUser";
@@ -555,12 +553,6 @@ const SettingsScreen = () => {
           <Col span={12}>
             <section>
               <div>
-                <p className="pl-[4px] opacity-60">{t("PDFSetting")}</p>
-                <Card className="mt-[6px]">
-                  <PDFSettings />
-                </Card>
-              </div>
-              <div className="mt-[16px]">
                 <p className="pl-[4px]">
                   <span className="opacity-60">{t("DatabaseManagement")}</span>
                   {planType === "FREE" && (
@@ -711,9 +703,6 @@ const SettingsScreen = () => {
           </Col>
           <Col span={12}>
             <div>
-              <PDFPreviewCard />
-            </div>
-            <div className="mt-[16px]">
               <p className="pl-[4px] opacity-60">{t("SubscriptionInfo")}</p>
               <Card className="mt-[6px]">
                 <div className="flex flex-col w-full gap-[10px]">

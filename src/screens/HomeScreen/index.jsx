@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 import { QuickActionsModal } from "./quickActionModal";
 import { useEffect, useState } from "react";
 import { send } from "../../control/renderer";
-import { PDFSettings } from "../SettingScreen/pdfSettings";
+import { PDFSettings } from "../TemplatesScreen/theme/pdfSettings";
 import { useAppTheme } from "../../hooks/useAppThem";
 import { PatientModal } from "../../components/Patients/Modal";
 import { DoctorModal } from "../../components/Doctors/Modal";

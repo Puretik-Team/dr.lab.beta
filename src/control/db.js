@@ -109,6 +109,7 @@ class LabDB {
       this.initTestsFromJSON();
       this.migrateVisitsTableWithDoctorForeignKey();
       await this.checkAndAddSyncColumns();
+      this.checkAndAddReportTemplatesTable();
       console.log(
         "LabDB initialized, db object:",
         this.db ? "exists" : "does not exist"
@@ -417,6 +418,147 @@ class LabDB {
       console.error("Error in getTopTraditionalTests:", err);
       return { success: false, error: err.message };
     }
+  }
+
+  // Report templates (Settings → Report Templates designer). Deliberately
+  // not in SYNCED_TABLES: the sync server has no mirror table for them, and
+  // designs can carry large embedded logos. The whole design lives in
+  // config_json; the scalar columns only exist for listing/filtering.
+  checkAndAddReportTemplatesTable() {
+    try {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS report_templates(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT,
+          name TEXT NOT NULL,
+          description TEXT,
+          category TEXT,
+          language TEXT,
+          page_size TEXT,
+          orientation TEXT,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          version INTEGER NOT NULL DEFAULT 1,
+          config_json TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+    } catch (error) {
+      log.error("[LabDB] Error creating report_templates table:", error && error.message);
+    }
+  }
+
+  rowToReportTemplate(row) {
+    if (!row) return null;
+    let config = {};
+    try {
+      config = JSON.parse(row.config_json) || {};
+    } catch (_) {}
+    return {
+      ...config,
+      id: row.id,
+      uuid: row.uuid,
+      name: row.name,
+      description: row.description || "",
+      category: row.category || "",
+      language: row.language || config.language || "en",
+      isDefault: !!row.is_default,
+      version: row.version,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  getReportTemplates() {
+    const rows = this.db
+      .prepare(`SELECT * FROM report_templates ORDER BY is_default DESC, updated_at DESC`)
+      .all();
+    return { success: true, data: rows.map((r) => this.rowToReportTemplate(r)) };
+  }
+
+  getReportTemplate(id) {
+    const row = this.db.prepare(`SELECT * FROM report_templates WHERE id = ?`).get(id);
+    if (!row) return { success: false, error: "Template not found" };
+    return { success: true, data: this.rowToReportTemplate(row) };
+  }
+
+  getDefaultReportTemplate() {
+    const row = this.db
+      .prepare(`SELECT * FROM report_templates WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1`)
+      .get();
+    return row ? this.rowToReportTemplate(row) : null;
+  }
+
+  // Insert when `template.id` is empty, otherwise update (bumping version).
+  // Making a template default clears the flag everywhere else in the same
+  // transaction so there's never more than one.
+  saveReportTemplate(template) {
+    const now = new Date().toISOString();
+    const {
+      id,
+      name,
+      description = "",
+      category = "",
+      language = "en",
+      isDefault = false,
+      page = {},
+    } = template || {};
+    if (!String(name || "").trim()) return { success: false, error: "Template name is required" };
+
+    const config = { ...template };
+    delete config.id;
+    const run = this.db.transaction(() => {
+      if (isDefault) this.db.prepare(`UPDATE report_templates SET is_default = 0`).run();
+      if (id) {
+        const existing = this.db.prepare(`SELECT version FROM report_templates WHERE id = ?`).get(id);
+        if (!existing) throw new Error("Template not found");
+        const version = (existing.version || 1) + 1;
+        config.version = version;
+        config.updatedAt = now;
+        this.db
+          .prepare(
+            `UPDATE report_templates SET name = ?, description = ?, category = ?, language = ?,
+               page_size = ?, orientation = ?, is_default = ?, version = ?, config_json = ?, updated_at = ?
+             WHERE id = ?`
+          )
+          .run(
+            name.trim(), description, category, language, page.size || "A4",
+            page.orientation || "portrait", isDefault ? 1 : 0, version, JSON.stringify(config), now, id
+          );
+        return id;
+      }
+      config.version = 1;
+      config.createdAt = now;
+      config.updatedAt = now;
+      const info = this.db
+        .prepare(
+          `INSERT INTO report_templates (uuid, name, description, category, language, page_size,
+             orientation, is_default, version, config_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+        )
+        .run(
+          template.uuid || crypto.randomUUID(), name.trim(), description, category, language,
+          page.size || "A4", page.orientation || "portrait", isDefault ? 1 : 0,
+          JSON.stringify(config), now, now
+        );
+      return info.lastInsertRowid;
+    });
+    const savedId = run();
+    return this.getReportTemplate(Number(savedId));
+  }
+
+  deleteReportTemplate(id) {
+    const info = this.db.prepare(`DELETE FROM report_templates WHERE id = ?`).run(id);
+    return { success: info.changes > 0 };
+  }
+
+  // id = null clears the default, so visit reports go back to the classic layout.
+  setDefaultReportTemplate(id) {
+    this.db.transaction(() => {
+      this.db.prepare(`UPDATE report_templates SET is_default = 0`).run();
+      if (id) this.db.prepare(`UPDATE report_templates SET is_default = 1 WHERE id = ?`).run(id);
+    })();
+    return { success: true };
   }
 
   async checkAndAddVisitNumberColumn() {
