@@ -5,8 +5,8 @@ const electron = require("electron");
 const { PDF_CFG } = require("./config");
 
 const GRID_COLS = 4;
-const ROW_H = 7.2; // mm
-const CELL_PAD = 2.5;
+const ROW_H = 10.5; // mm — room for label + value without touching
+const CELL_PAD = 3.2;
 
 /**
  * A bordered patient-info grid (2 rows x 4 cols), each cell a small gray
@@ -34,13 +34,13 @@ function drawPatientGrid(doc, y, fields) {
     row.forEach((field, c) => {
       const cellX = margin.left + colW * c;
       const cellY = y + ROW_H * r;
-      const labelY = cellY + 3;
-      const valueY = cellY + 5.9;
+      const labelY = cellY + 3.9;
+      const valueY = cellY + 8.4;
 
       const textX = cellX + colW - CELL_PAD; // right edge — text grows leftward (RTL)
 
       doc.setFont(PDF_CFG.font.family, "normal");
-      doc.setFontSize(6.2);
+      doc.setFontSize(7);
       doc.setTextColor(107, 104, 128);
       doc.text(field.label, textX, labelY, {
         lang: "ar",

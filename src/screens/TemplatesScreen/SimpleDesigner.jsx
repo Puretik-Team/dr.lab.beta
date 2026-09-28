@@ -1,17 +1,46 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Input, Spin, message, theme } from "antd";
 import { CheckOutlined } from "@ant-design/icons";
-import { LuImagePlus, LuFileText } from "react-icons/lu";
+import { LuFileText, LuBan, LuUpload } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { resolvePageSize } from "../../templates/schema";
 import { renderStaticPage } from "../../templates/engine";
-import { SIMPLE_COLORS, SIMPLE_DESIGNS, buildSimpleTemplate, defaultSimpleSettings } from "../../templates/simple";
+import { SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo } from "../../templates/simple";
+import drLabLogo from "../../assets/light-logo.png";
 import { getAccountLab, listTemplates, previewData, saveTemplate, showExample } from "./api";
 import { readImage } from "./readImage";
 import PageView from "./components/PageView";
 import StepWizard from "./components/StepWizard";
 
 // "Create your own design": pick a look, add a logo, pick a color, save.
+
+// The Dr. Lab logo ships as a bundled asset URL; templates embed images as
+// data URLs (they must print without the app's asset server), so convert once.
+async function drLabLogoDataUrl() {
+  const blob = await (await fetch(drLabLogo)).blob();
+  return readImage(new File([blob], "drlab.png", { type: blob.type || "image/png" }));
+}
+
+function LogoTile({ selected, onClick, children, label }) {
+  const { token } = theme.useToken();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="sd-logo-tile"
+      title={label}
+      style={{
+        borderColor: selected ? token.colorPrimary : token.colorBorderSecondary,
+        boxShadow: selected ? `0 0 0 3px ${token.colorPrimaryBg}` : "none",
+        background: token.colorBgContainer,
+        color: token.colorTextSecondary,
+      }}
+    >
+      <div className="sd-logo-tile-art">{children}</div>
+      <span style={{ color: selected ? token.colorPrimary : token.colorText }}>{label}</span>
+    </button>
+  );
+}
 
 function DesignCard({ design, settings, selected, onClick, label }) {
   const { token } = theme.useToken();
@@ -49,6 +78,7 @@ export default function SimpleDesigner({ active, onActivated }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [drLabLogoData, setDrLabLogoData] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -78,6 +108,20 @@ export default function SimpleDesigner({ active, onActivated }) {
     setDirty(true);
   };
   const setLab = (k, v) => set({ lab: { ...settings.lab, [k]: v } });
+  // logoChoice records which kind of logo was picked, so a saved Dr. Lab logo
+  // isn't mistaken for an uploaded one when the screen is reopened.
+  const isDrLab = settings.logoChoice === "drlab";
+  const isUploaded = !!settings.logo && !settings.logo.startsWith("icon:") && !isDrLab;
+
+  const pickDrLab = async () => {
+    try {
+      const data = drLabLogoData || (await drLabLogoDataUrl());
+      setDrLabLogoData(data);
+      set({ logo: data, logoChoice: "drlab" });
+    } catch (err) {
+      message.error(t("SD_Error"));
+    }
+  };
   const size = resolvePageSize(template.page);
   const inUse = active && !dirty;
 
@@ -86,7 +130,7 @@ export default function SimpleDesigner({ active, onActivated }) {
     e.target.value = "";
     if (!f) return;
     try {
-      set({ logo: await readImage(f) });
+      set({ logo: await readImage(f), logoChoice: "upload" });
     } catch (err) {
       message.error(err.message);
     }
@@ -143,29 +187,32 @@ export default function SimpleDesigner({ active, onActivated }) {
       hint: t("SD_Hint2"),
       content: (
         <>
-          <div className="sd-lab">
-            <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" onChange={pickLogo} />
-            <button
-              type="button"
-              className="sd-logo"
-              style={{ borderColor: token.colorBorder, background: token.colorFillQuaternary, color: token.colorTextSecondary }}
-              onClick={() => fileRef.current?.click()}
-            >
-              {settings.logo ? <img src={settings.logo} alt="" /> : (<><LuImagePlus size={30} /><span>{t("SD_Logo")}</span></>)}
-            </button>
-            <div className="sd-lab-fields">
-              {bigInput("name", t("SD_LabName"))}
-              {bigInput("subtitle", t("SD_LabSubtitle"))}
-              {bigInput("phone", t("SD_Phone"))}
-              {bigInput("address", t("SD_Address"))}
-            </div>
+          <div className="sd-sub" style={{ color: token.colorText }}>{t("SD_ChooseLogo")}</div>
+          <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" onChange={pickLogo} />
+          <div className="sd-logo-grid">
+            <LogoTile label={t("SD_NoLogo")} selected={!settings.logo} onClick={() => set({ logo: "", logoChoice: "" })}>
+              <LuBan size={26} />
+            </LogoTile>
+            <LogoTile label="Dr. Lab" selected={isDrLab} onClick={pickDrLab}>
+              <img src={drLabLogo} alt="" />
+            </LogoTile>
+            {LOGO_ICONS.map((id) => (
+              <LogoTile key={id} label={t(`SD_Icon_${id}`)} selected={settings.logo === `icon:${id}`} onClick={() => set({ logo: `icon:${id}`, logoChoice: "icon" })}>
+                <img src={resolveLogo(`icon:${id}`, settings.color)} alt="" />
+              </LogoTile>
+            ))}
+            <LogoTile label={t("SD_UploadLogo")} selected={isUploaded} onClick={() => fileRef.current?.click()}>
+              {isUploaded ? <img src={settings.logo} alt="" /> : <LuUpload size={26} />}
+            </LogoTile>
           </div>
-          {settings.logo && (
-            <div className="flex gap-2 mt-3">
-              <Button onClick={() => fileRef.current?.click()}>{t("SD_ChangeLogo")}</Button>
-              <Button danger type="text" onClick={() => set({ logo: "" })}>{t("SD_RemoveLogo")}</Button>
-            </div>
-          )}
+
+          <div className="sd-sub mt-6" style={{ color: token.colorText }}>{t("SD_LabDetails")}</div>
+          <div className="sd-lab-fields">
+            {bigInput("name", t("SD_LabName"))}
+            {bigInput("subtitle", t("SD_LabSubtitle"))}
+            {bigInput("phone", t("SD_Phone"))}
+            {bigInput("address", t("SD_Address"))}
+          </div>
         </>
       ),
     },

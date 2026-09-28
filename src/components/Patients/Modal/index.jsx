@@ -16,6 +16,7 @@ import "./style.css";
 import { send } from "../../../control/renderer";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import AgeInput from "../../Global/AgeInput";
 import { isValidMobilePhoneNumber } from "../../../helper/phoneValidation";
 import { isValidEmail } from "../../../helper/emailValidation";
 
@@ -150,24 +151,7 @@ export const PureModal = () => {
           <Col span={10}>
             <Space style={{ width: "100%" }} direction="vertical" size={4}>
               <Text>{t("Age")}</Text>
-              <Input
-                type="number"
-                min={0}
-                value={birth ? dayjs().diff(dayjs(birth), "year") : ""}
-                onChange={(e) => {
-                  const age = parseInt(e.target.value, 10);
-                  if (!isNaN(age) && age >= 0) {
-                    const birthDate = dayjs()
-                      .subtract(age, "year")
-                      .startOf("year");
-                    setBirth(birthDate);
-                  } else {
-                    setBirth(null);
-                  }
-                }}
-                placeholder={t("EnterAge")}
-                style={{ width: "100%" }}
-              />
+              <AgeInput birth={birth} onChange={setBirth} placeholder={t("EnterAge")} />
               {/* <DatePicker
                 picker={t("year")}
                 value={birth}

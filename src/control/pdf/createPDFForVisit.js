@@ -33,6 +33,7 @@ async function createPDFForVisit({
   labInfo = null,
   tableHeaderColor = null,
   tableHeaderTextColor = null,
+  outPath = null, // theme preview renders elsewhere so it never clobbers visit.pdf
 }) {
   const { app, shell } = electron || {};
   try {
@@ -148,7 +149,7 @@ async function createPDFForVisit({
 
     drawFooterWithPagination(doc, footer, { labInfo });
 
-    const filePath = (app ? app.getPath("userData") : ".") + "/visit.pdf";
+    const filePath = outPath || (app ? app.getPath("userData") : ".") + "/visit.pdf";
     await doc.save(filePath);
     if (isView && shell) shell.openPath(filePath);
     const file = LocalFileData ? new LocalFileData(filePath) : null;
@@ -191,7 +192,11 @@ function calcAgeText(isoBirth) {
   const b = dayjs(isoBirth);
   if (!b.isValid()) return "-";
   const years = dayjs().diff(b, "year");
-  return `${years} سنة`;
+  if (years >= 1) return `${years} سنة`;
+  // Babies: months, or days under one month.
+  const months = dayjs().diff(b, "month");
+  if (months >= 1) return `${months} شهر`;
+  return `${Math.max(0, dayjs().diff(b, "day"))} يوم`;
 }
 
 function translateGender(g) {

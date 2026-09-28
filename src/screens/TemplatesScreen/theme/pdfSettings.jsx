@@ -160,15 +160,6 @@ export const PDFSettings = ({ section }) => {
     }
   };
 
-  // No section: everything at once (Home screen's setup panel).
-  if (!section)
-    return (
-      <div className="flex flex-col gap-6">
-        <PDFSettings section="header" />
-        <PDFSettings section="options" />
-        <PDFSettings section="footer" />
-      </div>
-    );
   if (section === "header")
     return (
       <div>

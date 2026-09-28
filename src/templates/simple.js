@@ -3,7 +3,7 @@
 // (content.simple) so the simple screen can reopen them later.
 const { createTemplate, BRAND } = require("./schema");
 const { buildPreset } = require("./presets");
-const { mix } = require("./svgLibrary");
+const { mix, renderLibrarySvg, svgToDataUrl } = require("./svgLibrary");
 
 const SIMPLE_COLORS = [
   { id: "purple", hex: "#6A48B8" },
@@ -18,6 +18,25 @@ const SIMPLE_DESIGNS = [
   "modernPurple", "gradient", "split", "science", "soft", "ribbon",
   "clinical", "elegant", "minimal", "corporate", "headerFooter",
 ];
+
+// Ready-made logos for labs without one: a library illustration inside a
+// round badge, drawn in the report's color. Stored in settings as
+// "icon:<libraryId>" so the badge follows later color changes.
+const LOGO_ICONS = ["microscope", "testTube", "flask", "dnaHelix", "medicalCross", "bloodDrop", "molecule", "heartbeat"];
+
+function logoBadgeSvg(id, color) {
+  const inner = renderLibrarySvg(id, "custom", color).replace("<svg ", '<svg x="17" y="17" width="66" height="66" ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="${mix(
+    color,
+    "#FFFFFF",
+    0.9
+  )}" stroke="${color}" stroke-width="3"/>${inner}</svg>`;
+}
+
+function resolveLogo(logo, color) {
+  if (typeof logo === "string" && logo.startsWith("icon:")) return svgToDataUrl(logoBadgeSvg(logo.slice(5), color));
+  return logo || "";
+}
 
 // Every brand shade the presets use, mapped to the same role in the new color.
 function colorMap(hex) {
@@ -83,8 +102,9 @@ function buildSimpleTemplate(settings, existing = null) {
     isDefault: true,
   });
   let els = buildPreset(settings.design, t);
-  if (settings.logo) {
-    els = els.map((e) => (e.role === "logo" ? { ...e, src: settings.logo } : e));
+  const logo = resolveLogo(settings.logo, settings.color);
+  if (logo) {
+    els = els.map((e) => (e.role === "logo" ? { ...e, src: logo } : e));
   } else {
     // No logo: drop the empty logo slot (and its backing plate) instead of
     // leaving a blank box on every report.
@@ -105,4 +125,4 @@ function buildSimpleTemplate(settings, existing = null) {
   };
 }
 
-module.exports = { SIMPLE_COLORS, SIMPLE_DESIGNS, buildSimpleTemplate, defaultSimpleSettings };
+module.exports = { SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo };

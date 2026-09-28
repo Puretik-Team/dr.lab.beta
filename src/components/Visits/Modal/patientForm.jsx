@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { send } from "../../../control/renderer";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import AgeInput from "../../Global/AgeInput";
 
 const { Text } = Typography;
 
@@ -101,27 +102,10 @@ const PatientForm = () => {
         <Col span={10}>
           <Space style={{ width: "100%" }} direction="vertical" size={4}>
             <Text>{t("Age")}</Text>
-            <Input
-              type="number"
-              min={0}
-              value={
-                patientRow?.birth
-                  ? dayjs().diff(dayjs(patientRow.birth), "year")
-                  : ""
-              }
-              onChange={(e) => {
-                const age = parseInt(e.target.value, 10);
-                if (!isNaN(age) && age >= 0) {
-                  const birthDate = dayjs()
-                    .subtract(age, "year")
-                    .startOf("year");
-                  setPatientRow({ ...patientRow, birth: birthDate });
-                } else {
-                  setPatientRow({ ...patientRow, birth: null });
-                }
-              }}
+            <AgeInput
+              birth={patientRow?.birth}
+              onChange={(birth) => setPatientRow({ ...patientRow, birth })}
               placeholder={t("EnterAge")}
-              style={{ width: "100%" }}
             />
             {/* <DatePicker
               picker={t("year")}

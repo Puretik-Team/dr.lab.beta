@@ -14,6 +14,7 @@ const Jimp = require("jimp");
 const nodeHtmlToImage = require("node-html-to-image");
 const log = require("electron-log");
 const { createPDFForVisit } = require("./pdf/createPDFForVisit");
+const { pdfFirstPageToPng } = require("./pdf/rasterize");
 const { renderTemplateToPDF } = require("./templates/pdfExporter");
 const { visitToReportData } = require("../templates/reportData");
 const { normalizeTemplate, mergeLabInfo } = require("../templates/schema");
@@ -89,6 +90,35 @@ function logPrintOperation(operation, data, result = null, error = null) {
     log.info(`[PRINT_INFO] ${operation}:`, logData);
   }
 }
+
+// Sample visit for the theme preview — a typical mix of standalone tests and a
+// panel, with some results out of range so the status colors show.
+const SAMPLE_PREVIEW_VISIT = {
+  visitNumber: "260927-000231",
+  createdAt: new Date().toISOString(),
+  patient: { id: 1042, name: "سارة أحمد", gender: "female", phone: "07700000000", birth: "1992-03-14" },
+  doctor: { name: "د. عمر خالد" },
+  tests: [
+    { type: "single", name_en: "Fasting Blood Sugar", unit: "mg/dL", ref_text: "70-110", sample_type: "Serum", result_json: { result: "126" } },
+    { type: "single", name_en: "Random Blood Sugar", unit: "mg/dL", ref_text: "", sample_type: "Serum", result_json: { result: "140" } },
+    { type: "single", name_en: "HbA1c", unit: "%", ref_text: "<5.7", sample_type: "Whole Blood", result_json: { result: "5.2" } },
+    { type: "single", name_en: "Urea", unit: "mg/dL", ref_text: "15-45", sample_type: "Plasma", result_json: { result: "31" } },
+    { type: "single", name_en: "Creatinine", unit: "mg/dL", ref_text: "0.6-1.2", sample_type: "Plasma", result_json: { result: "1.4" } },
+    { type: "single", name_en: "Uric Acid", unit: "mg/dL", ref_text: "3.5-7.2 M / 2.6-6.0 F", sample_type: "Plasma", result_json: { result: "2.1" } },
+    {
+      type: "panel",
+      name_en: "Complete Blood Count",
+      meta_json: JSON.stringify({
+        items: [
+          { code: "WBC", name_en: "WBC", unit: "10^3/uL", ref: "4.0-11.0" },
+          { code: "HGB", name_en: "Hemoglobin", unit: "g/dL", ref: "12.0-16.0" },
+          { code: "PLT", name_en: "Platelets", unit: "10^3/uL", ref: "150-450" },
+        ],
+      }),
+      result_json: { items: { WBC: { result: "11.8" }, HGB: { result: "11.2" }, PLT: { result: "268" } } },
+    },
+  ],
+};
 
 // Helper function to get watermark base64 for free users
 function getWatermarkBase64() {
@@ -705,6 +735,39 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
         event.reply("asynchronous-reply-exportReportTemplatePDF", {
           success: false,
           error: error.message,
+        });
+      }
+      break;
+    }
+
+    // Report Design → "Add your theme" preview: builds the REAL classic report
+    // (same createPDFForVisit the print button uses) for a sample visit with
+    // the current theme settings, and returns page 1 as an image.
+    case "renderThemePreview": {
+      try {
+        const d = arg.data || {};
+        const outPath = path.join(app.getPath("userData"), "theme-preview.pdf");
+        const resp = await createPDFForVisit({
+          visit: SAMPLE_PREVIEW_VISIT,
+          isView: false,
+          watermarkBase64: d.planType === "FREE" ? getWatermarkBase64() : null,
+          fontSize: d.fontSize || 10,
+          headerEmpty: d.headerEmpty || false,
+          headerHeight: d.headerHeight || null,
+          footerEmpty: d.footerEmpty || false,
+          footerHeight: d.footerHeight || null,
+          tableHeaderColor: d.tableHeaderColor || null,
+          tableHeaderTextColor: d.tableHeaderTextColor || null,
+          outPath,
+        });
+        if (!resp.success) throw resp.error || new Error("PDF failed");
+        const image = await pdfFirstPageToPng(outPath, d.width || 900);
+        event.reply("asynchronous-reply-renderThemePreview", { success: true, image });
+      } catch (error) {
+        log.error("[PDF_ERROR] renderThemePreview:", error && (error.stack || error.message || String(error)));
+        event.reply("asynchronous-reply-renderThemePreview", {
+          success: false,
+          error: (error && error.message) || String(error),
         });
       }
       break;

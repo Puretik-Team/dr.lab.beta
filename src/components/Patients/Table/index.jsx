@@ -16,6 +16,7 @@ import {
 } from "antd";
 import "./style.css";
 import dayjs from "dayjs";
+import { splitAge } from "../../../helper/age";
 import { useAppStore, usePatientStore } from "../../../libs/appStore";
 import { useEffect, useState } from "react";
 import { send } from "../../../control/renderer";
@@ -71,12 +72,17 @@ export const PureTable = () => {
       title: t("Age"),
       dataIndex: "birth",
       key: "birth",
-      render: (birth) => (
-        <p>
-          {dayjs().diff(dayjs(birth), "y")}{" "}
-          <span style={{ color: "#666" }}>{t("age")}</span>
-        </p>
-      ),
+      render: (birth) => {
+        const { value, unit } = splitAge(birth);
+        return (
+          <p>
+            {value ?? "-"}{" "}
+            <span style={{ color: "#666" }}>
+              {unit === "year" ? t("age") : unit === "month" ? t("AgeMonths") : t("AgeDays")}
+            </span>
+          </p>
+        );
+      },
     },
 
     {

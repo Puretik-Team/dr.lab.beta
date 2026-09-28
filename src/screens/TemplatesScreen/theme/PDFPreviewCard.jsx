@@ -1,182 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { InputNumber, Modal, Slider, Switch } from "antd";
+import React, { useEffect, useRef, useState } from "react";
+import { InputNumber, Modal, Slider, Spin, Switch } from "antd";
 import { ExpandOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../../libs/appStore";
+import { usePlan } from "../../../hooks/usePlan";
+import { send } from "../../../control/renderer";
 
-// Same page proportions the report itself uses (src/control/pdf/config.js's
-// page format), so every mm value below maps the same way it does in
-// header.js/footer.js.
-const PAGE_W_MM = 210;
-const PAGE_H_MM = 297;
 const MIN_HEIGHT = 5;
 const MAX_HEIGHT = 120;
+const A4_RATIO = 297 / 210;
 
-/**
- * Loads `url` off-screen and reports the height (in mm, at the report's full
- * page width) it would print at with NO explicit height override — the same
- * `pageWidth * naturalHeight/naturalWidth` header.js/footer.js use for
- * "Auto". Returns null until it's known (no url, or still loading).
- */
-function useAutoHeightMM(url) {
-  const [mm, setMm] = useState(null);
-
-  useEffect(() => {
-    setMm(null);
-    if (!url) return;
-    const img = new Image();
-    img.onload = () => {
-      if (img.naturalWidth) setMm((PAGE_W_MM * img.naturalHeight) / img.naturalWidth);
-    };
-    img.src = url;
-    return () => {
-      img.onload = null;
-    };
-  }, [url]);
-
-  return mm;
-}
-
-// Mirrors what the PDF actually does, including the two ways it can differ
-// from a naive "always show a placeholder" preview:
-//  - "empty" reserves blank space on purpose — real report, no image.
-//  - a header with NO image reserves NO space at all (header.js only applies
-//    a height override once an image exists); a footer WITH a height set
-//    still reserves that blank space even with no image (footer.js applies
-//    it unconditionally) — so the two are deliberately not symmetric here.
-//  - when a height is set, the real report *stretches* the image to fill it
-//    exactly (jsPDF's addImage has no "cover" mode) — so this preview
-//    stretches too, rather than cropping, to show the real distortion.
-function Zone({ empty, heightMm, imagePath, emptyLabel, noImageLabel, previewH, scale }) {
-  const heightPx = Math.round(((heightMm || 0) / PAGE_H_MM) * previewH);
-
-  if (imagePath) {
-    return (
-      <div style={{ height: heightPx, flexShrink: 0, overflow: "hidden" }}>
-        <img
-          src={imagePath}
-          style={{ width: "100%", height: "100%", objectFit: "fill", display: "block" }}
-        />
-      </div>
-    );
-  }
-  if (heightPx <= 0) return null;
-  return (
-    <div
-      style={{
-        height: heightPx,
-        flexShrink: 0,
-        background: empty
-          ? "repeating-linear-gradient(45deg, #f5f5f5, #f5f5f5 4px, #eaeaea 4px, #eaeaea 8px)"
-          : "#fff",
-        borderTop: empty ? "none" : "1px dashed #e2e2e2",
-        borderBottom: empty ? "none" : "1px dashed #e2e2e2",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {heightPx > 10 * scale && (
-        <span style={{ color: "#bbb", fontSize: 8 * scale }}>
-          {empty ? emptyLabel : noImageLabel}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// The mock A4 page itself — used both inline (small) and, at a larger scale,
-// inside the click-to-enlarge modal, so the two never drift apart. Takes
-// already-resolved {headerMm, footerMm, headerImagePath, footerImagePath} —
-// see resolveHeaderMm/resolveFooterMm for how those match header.js/footer.js.
-function PageMockup({
-  previewW,
-  scale,
-  headerImagePath,
-  headerMm,
-  headerEmpty,
-  footerImagePath,
-  footerMm,
-  footerEmpty,
-  emptyLabel,
-  noHeaderImageLabel,
-  noFooterImageLabel,
-}) {
-  const previewH = Math.round((previewW * PAGE_H_MM) / PAGE_W_MM);
-
-  return (
-    <div
-      style={{
-        width: previewW,
-        height: previewH,
-        flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        border: "1px solid #d9d9d9",
-        borderRadius: 4 * scale,
-        overflow: "hidden",
-        background: "#fff",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-      }}
-    >
-      <Zone
-        empty={headerEmpty}
-        heightMm={headerMm}
-        imagePath={headerImagePath}
-        emptyLabel={emptyLabel}
-        noImageLabel={noHeaderImageLabel}
-        previewH={previewH}
-        scale={scale}
-      />
-
-      <div style={{ padding: `${5 * scale}px ${7 * scale}px`, flex: 1 }}>
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            style={{
-              height: 5 * scale,
-              marginBottom: 5 * scale,
-              borderRadius: 2,
-              background: "#eee",
-              width: i % 2 === 0 ? "90%" : "70%",
-            }}
-          />
-        ))}
-      </div>
-
-      <Zone
-        empty={footerEmpty}
-        heightMm={footerMm}
-        imagePath={footerImagePath}
-        emptyLabel={emptyLabel}
-        noImageLabel={noFooterImageLabel}
-        previewH={previewH}
-        scale={scale}
-      />
-    </div>
-  );
-}
-
-// Mirrors header.js exactly: an override height only ever applies once an
-// image exists; with no image, the header reserves nothing at all.
-function resolveHeaderMm({ headerEmpty, headerHeight, hasImage, autoMm }) {
-  if (headerEmpty) return headerHeight || 0;
-  if (!hasImage) return 0;
-  return headerHeight ?? autoMm ?? 0;
-}
-
-// Mirrors footer.js exactly: unlike the header, a height override still
-// reserves blank space even with no footer image uploaded.
-function resolveFooterMm({ footerEmpty, footerHeight, hasImage, autoMm }) {
-  if (footerEmpty) return footerHeight || 0;
-  if (!hasImage) return footerHeight || 0;
-  return footerHeight ?? autoMm ?? 0;
-}
-
-// Shared control row for both header and footer: the "Leave ... Empty"
-// switch plus a Slider+InputNumber pair for the reserved height — moved here
-// (off the PDF Setting card) so they sit right next to the preview they
-// affect.
+// Shared control row for header and footer: the "Leave ... Empty" switch plus
+// a Slider+InputNumber pair for the reserved height.
 function SizeControls({ label, emptyLabel, empty, onEmptyChange, height, onHeightChange }) {
   const { t } = useTranslation();
   const effectiveHeight = height ?? 30; // illustrate "Auto" with a sane default
@@ -212,11 +47,90 @@ function SizeControls({ label, emptyLabel, empty, onEmptyChange, height, onHeigh
   );
 }
 
+// The preview is the REAL classic report: main renders a sample visit through
+// the same createPDFForVisit the print button uses, and returns page 1 as an
+// image (see "renderThemePreview" in src/control/main.js). Re-rendered shortly
+// after any setting changes, so what you see is exactly what prints.
+function useRealPreview(settings) {
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const latest = useRef(settings);
+  const busy = useRef(false);
+  const pending = useRef(false);
+  const key = JSON.stringify(settings);
+  latest.current = settings;
+
+  // One render at a time: send() resolves every pending request on the same
+  // reply channel, so overlapping renders could show a stale image. Changes
+  // made while a render is running trigger one more render with the latest
+  // settings afterwards.
+  const run = async () => {
+    if (busy.current) {
+      pending.current = true;
+      return;
+    }
+    busy.current = true;
+    const resp = await send({ query: "renderThemePreview", data: { ...latest.current, width: 900 } });
+    if (resp?.success) {
+      setImage(resp.image);
+      setError(null);
+    } else {
+      setError(resp?.error || "Preview failed");
+    }
+    busy.current = false;
+    if (pending.current) {
+      pending.current = false;
+      run();
+    } else {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    const timer = setTimeout(run, 450);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return { image, loading, error };
+}
+
+function PageImage({ image, loading, error, width }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      style={{
+        width,
+        height: Math.round(width * A4_RATIO),
+        background: "#fff",
+        border: "1px solid #d9d9d9",
+        borderRadius: 4,
+        overflow: "hidden",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        position: "relative",
+      }}
+    >
+      {image && <img src={image} alt="" style={{ width: "100%", display: "block" }} />}
+      {error && !image && (
+        <div className="flex items-center justify-center h-full text-[12px] text-[#aaa] p-3 text-center">{t("SD_Error")}</div>
+      )}
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.45)" }}>
+          <Spin />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // controls: "header" | "footer" | "none" — which size controls to show next
 // to the page preview.
 export default function PDFPreviewCard({ controls = "none", previewW = 150 }) {
   const { t } = useTranslation();
   const [zoomOpen, setZoomOpen] = useState(false);
+  const { planType } = usePlan();
   const {
     imagePath,
     footImagePath,
@@ -228,77 +142,37 @@ export default function PDFPreviewCard({ controls = "none", previewW = 150 }) {
     setFooterEmpty,
     footerHeight,
     setFooterHeight,
+    tableHeaderColor,
+    tableHeaderTextColor,
+    printFontSize,
   } = useAppStore();
 
-  const handleHeaderEmptyChange = (checked) => {
-    localStorage.setItem("lab-header-empty", checked ? "true" : "false");
-    setHeaderEmpty(checked);
+  const setLocal = (key, val, setter) => {
+    if (val === null || val === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, val);
+    setter(val ?? null);
   };
 
-  const handleHeaderHeightChange = (val) => {
-    if (val === null || val === undefined) {
-      localStorage.removeItem("lab-header-height");
-      setHeaderHeight(null);
-    } else {
-      localStorage.setItem("lab-header-height", val);
-      setHeaderHeight(val);
-    }
-  };
-
-  const handleFooterEmptyChange = (checked) => {
-    localStorage.setItem("lab-footer-empty", checked ? "true" : "false");
-    setFooterEmpty(checked);
-  };
-
-  const handleFooterHeightChange = (val) => {
-    if (val === null || val === undefined) {
-      localStorage.removeItem("lab-footer-height");
-      setFooterHeight(null);
-    } else {
-      localStorage.setItem("lab-footer-height", val);
-      setFooterHeight(val);
-    }
-  };
-
-  // "Auto" (no height set) prints at the real image's own aspect ratio, not
-  // a guessed size — so measure the actual files, same as header.js/footer.js do.
-  const headerAutoMm = useAutoHeightMM(headerEmpty ? null : imagePath);
-  const footerAutoMm = useAutoHeightMM(footerEmpty ? null : footImagePath);
-
-  const headerMm = resolveHeaderMm({
+  // imagePath/footImagePath change (cache-busted URL) whenever an image is
+  // uploaded or removed, which re-renders the preview with the new file.
+  const preview = useRealPreview({
+    planType,
+    fontSize: printFontSize,
     headerEmpty,
     headerHeight,
-    hasImage: !!imagePath,
-    autoMm: headerAutoMm,
-  });
-  const footerMm = resolveFooterMm({
     footerEmpty,
     footerHeight,
-    hasImage: !!footImagePath,
-    autoMm: footerAutoMm,
+    tableHeaderColor,
+    tableHeaderTextColor,
+    imagePath,
+    footImagePath,
   });
-
-  const mockupProps = {
-    headerImagePath: headerEmpty ? null : imagePath,
-    headerMm,
-    headerEmpty,
-    footerImagePath: footerEmpty ? null : footImagePath,
-    footerMm,
-    footerEmpty,
-    emptyLabel: t("Empty"),
-    noHeaderImageLabel: t("NoHeaderImage"),
-    noFooterImageLabel: t("NoFooterImage"),
-  };
 
   return (
     <div>
       <div className="flex gap-6 items-start flex-wrap">
-        <div
-          className="relative group cursor-pointer"
-          onClick={() => setZoomOpen(true)}
-          title={t("ClickToEnlarge")}
-        >
-          <PageMockup previewW={previewW} scale={previewW / 150} {...mockupProps} />
+        <div className="relative group cursor-pointer" onClick={() => setZoomOpen(true)} title={t("ClickToEnlarge")}>
+          <PageImage {...preview} width={previewW} />
           <div
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ background: "rgba(0,0,0,0.15)" }}
@@ -314,9 +188,9 @@ export default function PDFPreviewCard({ controls = "none", previewW = 150 }) {
                 label={t("HeaderHeight")}
                 emptyLabel={t("EmptyHeader")}
                 empty={headerEmpty}
-                onEmptyChange={handleHeaderEmptyChange}
+                onEmptyChange={(v) => setLocal("lab-header-empty", v ? "true" : "false", () => setHeaderEmpty(v))}
                 height={headerHeight}
-                onHeightChange={handleHeaderHeightChange}
+                onHeightChange={(v) => setLocal("lab-header-height", v, setHeaderHeight)}
               />
             )}
             {controls === "footer" && (
@@ -324,25 +198,18 @@ export default function PDFPreviewCard({ controls = "none", previewW = 150 }) {
                 label={t("FooterHeight")}
                 emptyLabel={t("EmptyFooter")}
                 empty={footerEmpty}
-                onEmptyChange={handleFooterEmptyChange}
+                onEmptyChange={(v) => setLocal("lab-footer-empty", v ? "true" : "false", () => setFooterEmpty(v))}
                 height={footerHeight}
-                onHeightChange={handleFooterHeightChange}
+                onHeightChange={(v) => setLocal("lab-footer-height", v, setFooterHeight)}
               />
             )}
           </div>
         )}
       </div>
 
-      <Modal
-        open={zoomOpen}
-        onCancel={() => setZoomOpen(false)}
-        footer={null}
-        centered
-        width="fit-content"
-        title={t("PDFPreview")}
-      >
+      <Modal open={zoomOpen} onCancel={() => setZoomOpen(false)} footer={null} centered width="fit-content" title={t("PDFPreview")}>
         <div className="flex justify-center py-2">
-          <PageMockup previewW={400} scale={2.6} {...mockupProps} />
+          <PageImage {...preview} width={560} />
         </div>
       </Modal>
     </div>

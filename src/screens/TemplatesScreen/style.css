@@ -194,3 +194,42 @@
     position: static;
   }
 }
+
+.sd-sub {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.sd-logo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.sd-logo-tile {
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 10px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.sd-logo-tile:hover {
+  transform: translateY(-2px);
+}
+.sd-logo-tile-art {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sd-logo-tile-art img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
