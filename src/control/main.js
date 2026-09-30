@@ -773,6 +773,55 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
       break;
     }
 
+    // Quick Actions "Preview" button: renders a sample report exactly like
+    // it will actually print and returns page 1 as an image, so it shows
+    // in-app in a modal instead of opening the OS PDF viewer. data.template
+    // set → the active report design (via renderTemplateToPDF, same engine
+    // as the designer); no template → the classic theme (same as
+    // renderThemePreview, current header/footer/table settings).
+    case "renderReportPreview": {
+      try {
+        const d = arg.data || {};
+        let outPath;
+        if (d.template) {
+          const template = normalizeTemplate(d.template);
+          outPath = path.join(app.getPath("userData"), "report-preview.pdf");
+          const resp = await renderTemplateToPDF({
+            template,
+            data: d.sampleData || {},
+            mode: "preview",
+            outPath,
+          });
+          if (!resp.success) throw resp.error || new Error("PDF failed");
+        } else {
+          outPath = path.join(app.getPath("userData"), "theme-preview.pdf");
+          const resp = await createPDFForVisit({
+            visit: SAMPLE_PREVIEW_VISIT,
+            isView: false,
+            watermarkBase64: d.planType === "FREE" ? getWatermarkBase64() : null,
+            fontSize: d.fontSize || 10,
+            headerEmpty: d.headerEmpty || false,
+            headerHeight: d.headerHeight || null,
+            footerEmpty: d.footerEmpty || false,
+            footerHeight: d.footerHeight || null,
+            tableHeaderColor: d.tableHeaderColor || null,
+            tableHeaderTextColor: d.tableHeaderTextColor || null,
+            outPath,
+          });
+          if (!resp.success) throw resp.error || new Error("PDF failed");
+        }
+        const image = await pdfFirstPageToPng(outPath, d.width || 900);
+        event.reply("asynchronous-reply-renderReportPreview", { success: true, image });
+      } catch (error) {
+        log.error("[PDF_ERROR] renderReportPreview:", error && (error.stack || error.message || String(error)));
+        event.reply("asynchronous-reply-renderReportPreview", {
+          success: false,
+          error: (error && error.message) || String(error),
+        });
+      }
+      break;
+    }
+
     case "sendWhatsapp": {
       try {
         const resp = await sendWhatsApp(arg.data);

@@ -31,6 +31,7 @@ export function send(doc) {
         "setDefaultReportTemplate",
         "exportReportTemplatePDF",
         "renderThemePreview",
+        "renderReportPreview",
       ].includes(queryName)
         ? `asynchronous-reply-${queryName}`
         : "asynchronous-reply";

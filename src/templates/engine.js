@@ -480,7 +480,12 @@ function elementInnerHTML(el, ctx) {
     }
 
     case "bgShape":
-      return `<img class="tpl-img" style="object-fit:fill" src="${esc(svgToDataUrl(bgShapeSvg(el)))}"/>`;
+      // The wave/diagonal art is hand-drawn asymmetric (rises on one side,
+      // cuts from one corner) — mirroring the element's x/w doesn't touch a
+      // full-width shape, so a horizontal flip is the only way it follows
+      // the logo to the other side. el.flip is set by mirrorZones() in
+      // presets.js.
+      return `<img class="tpl-img" style="object-fit:fill${el.flip ? ";transform:scaleX(-1)" : ""}" src="${esc(svgToDataUrl(bgShapeSvg(el)))}"/>`;
 
     case "badge":
       return `<img class="tpl-img" src="${esc(svgToDataUrl(badgeSvg(el)))}"/>`;

@@ -31,7 +31,7 @@ function langOpts(language) {
 }
 
 // Content shared by every non-blank preset: patient block, results table,
-// and a comments + signature group that follows the table on the last page.
+// and a signature that follows the table on the last page.
 function bodyBlocks(t, accent = {}) {
   const { width } = resolvePageSize(t.page);
   const b = getBodyBounds(t.page);
@@ -70,18 +70,6 @@ function bodyBlocks(t, accent = {}) {
       categoryColor: accent.headText || BRAND.purpleDeep,
       ...(accent.table || {}),
     }),
-    createElement("text", {
-      name: "Report comments",
-      x: left,
-      y: afterY,
-      w: w * 0.6,
-      h: 10,
-      fontSize: 8,
-      color: BRAND.muted,
-      autoHeight: true,
-      direction: L.ar ? "rtl" : "auto",
-      content: L.ar ? "ملاحظات: {{report.notes}}" : "Comments: {{report.notes}}",
-    }),
     createElement("signature", {
       name: "Signature",
       x: left + w - 52,
@@ -104,7 +92,21 @@ function labName(t, props) {
   });
 }
 
-function buildPreset(presetId, t) {
+// Flips every header/footer/background element horizontally, so a design
+// built logo-left/name-follows becomes logo-right/name-follows — used when
+// the report is meant to be read right-to-left (Arabic/Kurdish UI).
+function mirrorZones(els, W) {
+  return els.map((e) => {
+    if (e.zone !== "header" && e.zone !== "footer" && e.zone !== "background") return e;
+    const out = { ...e };
+    if (typeof out.x === "number" && typeof out.w === "number") out.x = W - out.x - out.w;
+    if (out.align === "start") out.align = "end";
+    else if (out.align === "end") out.align = "start";
+    return out;
+  });
+}
+
+function buildPreset(presetId, t, mirror = false, freeBadge = false) {
   const { width: W, height: H } = resolvePageSize(t.page);
   const hh = Number(t.page.headerHeight) || 0;
   const fh = Number(t.page.footerHeight) || 0;
@@ -112,17 +114,47 @@ function buildPreset(presetId, t) {
   const L = langOpts(t.language);
   const inner = W - m.left - m.right;
   const fy = H - fh; // footer top
-  const els = [];
+  let els = [];
   const H_ = (type, props) => els.push(createElement(type, { zone: "header", ...props }));
   const F_ = (type, props) => els.push(createElement(type, { zone: "footer", ...props }));
 
   switch (presetId) {
     case "minimal": {
       H_("image", { name: "Laboratory logo", role: "logo", x: m.left, y: 8, w: 26, h: Math.min(24, hh - 12) });
-      els.push(labName(t, { zone: "header", x: m.left + 30, y: 10, w: inner - 30, h: 9 }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 30, y: 19, w: inner - 30, h: 6, fontSize: 9, color: BRAND.muted });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}} · {{laboratory.address}}", x: m.left + 30, y: 25, w: inner - 30, h: 6, fontSize: 8, color: BRAND.muted });
-      H_("divider", { x: m.left, y: hh - 3, w: inner, h: 2, variant: "gradient" });
+      if (freeBadge) {
+        // Free-plan co-branding: a small Dr. Lab badge sits right beside the
+        // lab's own logo, and the lab's details move to the far right so the
+        // two logos read as a pair on the left.
+        // light-name.png is the wide Dr. Lab wordmark (~3.16:1), not the
+        // square icon — sized to that ratio and vertically centered on the
+        // lab's own logo (which spans y:8 to y:8+24).
+        H_("image", { name: "Dr. Lab badge", role: "drlabBadge", x: m.left + 30, y: 16, w: 26, h: 8.2 });
+        H_("text", {
+          name: "Dr. Lab tagline",
+          content: "All things that your lab needs",
+          x: m.left + 30,
+          y: 25,
+          w: 40,
+          h: 5,
+          fontSize: 5.5,
+          fontWeight: 700,
+          color: BRAND.ink,
+        });
+        const infoW = Math.min(90, inner - 58);
+        const infoX = W - m.right - infoW;
+        els.push(labName(t, { zone: "header", x: infoX, y: 10, w: infoW, h: 9, align: "end" }));
+        H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: infoX, y: 19, w: infoW, h: 6, fontSize: 9, color: BRAND.muted, align: "end" });
+        H_("text", { name: "Contact", content: "{{laboratory.phone}} · {{laboratory.address}}", x: infoX, y: 25, w: infoW, h: 6, fontSize: 8, color: BRAND.muted, align: "end" });
+      } else {
+        // Logo stays on the left; the lab's own details sit at the far
+        // right of the header instead of following right next to the logo.
+        const infoW = Math.min(120, inner - 34);
+        const infoX = W - m.right - infoW;
+        els.push(labName(t, { zone: "header", x: infoX, y: 10, w: infoW, h: 9, align: "end" }));
+        H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: infoX, y: 19, w: infoW, h: 6, fontSize: 9, color: BRAND.muted, align: "end" });
+        H_("text", { name: "Contact", content: "{{laboratory.phone}} · {{laboratory.address}}", x: infoX, y: 25, w: infoW, h: 6, fontSize: 8, color: BRAND.muted, align: "end" });
+      }
+      H_("line", { x: m.left, y: hh - 3, w: inner, h: 2, stroke: BRAND.ink, strokeWidth: 0.4 });
       F_("line", { x: m.left, y: fy + 2, w: inner, h: 2, stroke: BRAND.line, strokeWidth: 0.3 });
       F_("text", { name: "Footer contact", content: "{{laboratory.website}} · {{laboratory.email}}", x: m.left, y: fy + 6, w: inner * 0.7, h: 6, fontSize: 7.5, color: BRAND.muted });
       F_("pageNumber", { x: W - m.right - 35, y: fy + 6, w: 35, h: 6, align: "end" });
@@ -131,7 +163,12 @@ function buildPreset(presetId, t) {
     }
 
     case "modernPurple": {
-      H_("bgShape", { name: "Header wave", shape: "waveTop", x: 0, y: 0, w: W, h: hh, fill: BRAND.purpleDeep, fill2: "#9B7FE0" });
+      // flip: the wave dips lower on one side — flipped so the deeper dip
+      // sits under the DNA accent (now on the left) instead of under the
+      // name/logo (now on the right). Unlike gradient's diagonal, the name
+      // and subtitle sit in the wave's solid top band either way, so this
+      // is purely cosmetic, not a contrast risk.
+      H_("bgShape", { name: "Header wave", shape: "waveTop", x: 0, y: 0, w: W, h: hh, fill: BRAND.purpleDeep, fill2: "#9B7FE0", flip: true });
       H_("svg", { name: "DNA accent", libraryId: "dnaBand", palette: "lavender", x: W * 0.52, y: 3, w: W * 0.45, h: 11, opacity: 0.55 });
       H_("rect", { name: "Logo plate", x: m.left, y: 6, w: 24, h: 24, fill: "#FFFFFF", borderRadius: 4 });
       H_("image", { name: "Laboratory logo", role: "logo", x: m.left + 2, y: 8, w: 20, h: 20 });
@@ -218,6 +255,10 @@ function buildPreset(presetId, t) {
     }
 
     case "gradient": {
+      // Not flipped: the diagonal is tall on the left, under the lab name,
+      // and shallow on the right, under the logo — flipping it moves the
+      // tall/colored part under the logo instead and leaves the name's
+      // subtitle sitting on plain white (unreadable, low-contrast text).
       H_("bgShape", { name: "Header gradient", shape: "diagonal", x: 0, y: 0, w: W, h: hh - 2, fill: BRAND.purpleDeep, fill2: "#9B7FE0" });
       els.push(labName(t, { zone: "header", x: m.left, y: 9, w: inner - 40, h: 9, fontSize: 18, color: "#FFFFFF" }));
       H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left, y: 18.5, w: inner - 40, h: 5, fontSize: 9, color: "#EDE7FA" });
@@ -304,6 +345,7 @@ function buildPreset(presetId, t) {
       if (e.type === "text" && e.direction === "auto") e.direction = "rtl";
     });
   }
+  if (mirror) els = mirrorZones(els, W);
   return els;
 }
 

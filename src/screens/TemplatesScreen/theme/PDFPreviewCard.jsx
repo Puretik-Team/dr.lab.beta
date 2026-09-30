@@ -11,8 +11,9 @@ const MAX_HEIGHT = 120;
 const A4_RATIO = 297 / 210;
 
 // Shared control row for header and footer: the "Leave ... Empty" switch plus
-// a Slider+InputNumber pair for the reserved height.
-function SizeControls({ label, emptyLabel, empty, onEmptyChange, height, onHeightChange }) {
+// a Slider+InputNumber pair for the reserved height. Exported so the "leave
+// space for my pre-printed header/footer" design tile can reuse it directly.
+export function SizeControls({ label, emptyLabel, empty, onEmptyChange, height, onHeightChange }) {
   const { t } = useTranslation();
   const effectiveHeight = height ?? 30; // illustrate "Auto" with a sane default
 

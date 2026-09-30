@@ -5,18 +5,19 @@ const { createTemplate, BRAND } = require("./schema");
 const { buildPreset } = require("./presets");
 const { mix, renderLibrarySvg, svgToDataUrl } = require("./svgLibrary");
 
+// "dark" is first — it's the only free color, the rest need a subscription.
 const SIMPLE_COLORS = [
+  { id: "dark", hex: "#2B2D42" },
   { id: "purple", hex: "#6A48B8" },
   { id: "blue", hex: "#1F57C3" },
   { id: "teal", hex: "#0F8A7E" },
   { id: "green", hex: "#2E7D32" },
   { id: "red", hex: "#A61E4D" },
-  { id: "dark", hex: "#2B2D42" },
 ];
 
 const SIMPLE_DESIGNS = [
   "modernPurple", "gradient", "split", "science", "soft", "ribbon",
-  "clinical", "elegant", "minimal", "corporate", "headerFooter",
+  "elegant", "minimal", "corporate", "headerFooter",
 ];
 
 // Ready-made logos for labs without one: a library illustration inside a
@@ -92,7 +93,7 @@ function defaultSimpleSettings(accountLab = {}) {
   };
 }
 
-function buildSimpleTemplate(settings, existing = null) {
+function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadge = false, drLabBadgeSrc = "", drLabLogoSrc = "") {
   const t = createTemplate({
     name: existing?.name || "My report design",
     description: "Made with the simple report designer",
@@ -101,8 +102,16 @@ function buildSimpleTemplate(settings, existing = null) {
     language: "en",
     isDefault: true,
   });
-  let els = buildPreset(settings.design, t);
-  const logo = resolveLogo(settings.logo, settings.color);
+  // The header/footer layout mirrors (logo on the right, name following it)
+  // when the app itself is being used in a right-to-left language, since
+  // that's almost always when the lab name is Arabic/Kurdish too.
+  // freeBadge co-brands the report with a small Dr. Lab logo beside the
+  // lab's own — shown for accounts on the free plan, the "minimal" design only.
+  let els = buildPreset(settings.design, t, mirror, freeBadge && !!drLabBadgeSrc);
+  // "Simple" always shows the Dr. Lab logo, regardless of what the lab
+  // picked — the logo choice step has no effect on this design.
+  const forceDrLabLogo = settings.design === "minimal" && !!drLabLogoSrc;
+  const logo = forceDrLabLogo ? drLabLogoSrc : resolveLogo(settings.logo, settings.color);
   if (logo) {
     els = els.map((e) => (e.role === "logo" ? { ...e, src: logo } : e));
   } else {
@@ -111,6 +120,9 @@ function buildSimpleTemplate(settings, existing = null) {
     els = els.filter((e) => e.role !== "logo" && e.name !== "Logo plate");
     // Designs with a logo block show a simple white icon in it instead.
     els = els.map((e) => (e.role === "logoFallback" ? { ...e, opacity: 1, palette: "white" } : e));
+  }
+  if (drLabBadgeSrc) {
+    els = els.map((e) => (e.role === "drlabBadge" ? { ...e, src: drLabBadgeSrc } : e));
   }
   els = els.filter((e) => !(e.role === "logoFallback" && e.opacity === 0));
   els = recolor(els, settings.color);

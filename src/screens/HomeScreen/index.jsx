@@ -15,6 +15,7 @@ import {
   Button,
   Radio,
   Spin,
+  message,
 } from "antd";
 import "./style.css";
 import { PureModal, PureTable } from "../../components/Visits";
@@ -30,8 +31,10 @@ import { QuickActionsModal } from "./quickActionModal";
 import { useEffect, useState } from "react";
 import { send } from "../../control/renderer";
 import { useAppTheme } from "../../hooks/useAppThem";
+import { usePlan } from "../../hooks/usePlan";
 import { PatientModal } from "../../components/Patients/Modal";
 import { DoctorModal } from "../../components/Doctors/Modal";
+import { listTemplates, previewData } from "../TemplatesScreen/api";
 
 const { Search } = Input;
 function CardStatistics({ icon, title, value, loading }) {
@@ -65,12 +68,65 @@ const HomeScreen = () => {
   const { setIsModal: openPatientModal } = usePatientStore();
   const { setIsModal: openDoctorModal } = useDoctorStore();
 
-  const { isReload } = useAppStore();
+  const {
+    isReload,
+    printFontSize,
+    headerEmpty,
+    headerHeight,
+    footerEmpty,
+    footerHeight,
+    tableHeaderColor,
+    tableHeaderTextColor,
+  } = useAppStore();
+  const { planType } = usePlan();
   const { t, i18n } = useTranslation();
   const direction = i18n.dir();
   const { lang, setLang } = useLanguage();
   const { appColors } = useAppTheme();
   const [quickList, setQuickList] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // Renders a sample report the same way it would actually print — the
+  // active report design if one's set as default, otherwise the classic
+  // theme with its current header/footer/table settings — and shows it
+  // in-app, small, always visible (no button press needed).
+  const handlePreview = async () => {
+    setPreviewLoading(true);
+    try {
+      const list = await listTemplates();
+      const def = list.find((x) => x.isDefault);
+      const resp = await send({
+        query: "renderReportPreview",
+        data: def
+          ? { template: def, sampleData: previewData(def, "standard"), width: 320 }
+          : {
+              planType,
+              fontSize: printFontSize,
+              headerEmpty,
+              headerHeight,
+              footerEmpty,
+              footerHeight,
+              tableHeaderColor,
+              tableHeaderTextColor,
+              width: 320,
+            },
+      });
+      if (!resp?.success) throw new Error(resp?.error || "Preview failed");
+      setPreviewImage(resp.image);
+    } catch (e) {
+      message.error(t("SD_Error"));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // Loads automatically — the point is to always have it visible, not to
+  // make the lab press a button first.
+  useEffect(() => {
+    handlePreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Statistics state
   const [statistics, setStatistics] = useState({
@@ -357,6 +413,21 @@ const HomeScreen = () => {
                     <Radio.Button value="en">English</Radio.Button>
                   </Radio.Group>
                 </Space>
+              </div>
+
+              <div
+                className="mt-4 p-2 rounded-[8px] shadow-lg flex justify-center items-center mx-auto"
+                style={{
+                  background: appColors?.bgColor,
+                  width: previewImage ? "fit-content" : 120,
+                  height: previewImage ? "auto" : 90,
+                }}
+              >
+                {previewImage ? (
+                  <img src={previewImage} alt="" style={{ width: 120, display: "block" }} className="rounded-[4px]" />
+                ) : (
+                  <Spin spinning={previewLoading} size="small" />
+                )}
               </div>
             </Card>
           </Col>
