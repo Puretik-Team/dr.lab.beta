@@ -127,7 +127,8 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
         // two logos read as a pair on the left.
         // light-name.png is the wide Dr. Lab wordmark (~3.16:1), not the
         // square icon — sized to that ratio and vertically centered on the
-        // lab's own logo (which spans y:8 to y:8+24).
+        // lab's own logo (which spans y:8 to y:8+24). The tagline sits under
+        // the wordmark, flush with its left edge.
         H_("image", { name: "Dr. Lab badge", role: "drlabBadge", x: m.left + 30, y: 16, w: 26, h: 8.2 });
         H_("text", {
           name: "Dr. Lab tagline",
@@ -177,7 +178,12 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
       if (L.ar || L.both)
         H_("text", { name: "Arabic title", content: "تقرير الفحوصات المختبرية", x: W - m.right - 70, y: 26, w: 70, h: 7, fontSize: 10, color: "#FFFFFF", align: "end", direction: "rtl" });
       F_("bgShape", { name: "Footer wave", shape: "waveBottom", x: 0, y: fy, w: W, h: fh, fill: BRAND.purple, fill2: BRAND.purpleDeep });
-      F_("qr", { x: m.left, y: fy + fh - 19, w: 15, h: 15, color: "#FFFFFF" });
+      // A white QR directly on the wavy gradient had no solid backing and
+      // used inverted (light-on-dark) colors — unreliable to scan and looks
+      // broken where the gradient shows through the gaps. Give it a flat
+      // white plate and standard dark-on-light modules instead.
+      F_("rect", { name: "QR plate", x: m.left - 1.5, y: fy + fh - 20.5, w: 18, h: 18, fill: "#FFFFFF", borderRadius: 2 });
+      F_("qr", { x: m.left, y: fy + fh - 19, w: 15, h: 15, color: BRAND.purpleDeep });
       F_("text", { name: "Footer contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}  ·  {{laboratory.website}}", x: m.left + 19, y: fy + fh - 13, w: inner - 60, h: 6, fontSize: 8, color: "#FFFFFF" });
       F_("pageNumber", { x: W - m.right - 35, y: fy + fh - 13, w: 35, h: 6, align: "end", color: "#FFFFFF" });
       els.push(...bodyBlocks(t));
@@ -204,20 +210,24 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "corporate": {
+      // Flipped: logo + name/subtitle move to the right (name right-aligned
+      // so it stays flush against the logo instead of leaving a gap when
+      // the name is short), and the contact column moves to the left. Both
+      // the contact column and the footer page number are now center-aligned.
       H_("rect", { name: "Top band", x: 0, y: 0, w: W, h: 7, fill: BRAND.purpleDeep, borderRadius: 0 });
-      H_("image", { name: "Laboratory logo", role: "logo", x: m.left, y: 11, w: 22, h: Math.min(22, hh - 16) });
-      els.push(labName(t, { zone: "header", x: m.left + 26, y: 12, w: inner * 0.5, h: 9, fontSize: 16, textTransform: "uppercase", letterSpacing: 0.5 }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 26, y: 21, w: inner * 0.5, h: 6, fontSize: 8.5, color: BRAND.muted });
+      H_("image", { name: "Laboratory logo", role: "logo", x: W - m.right - 22, y: 11, w: 22, h: Math.min(22, hh - 16) });
+      els.push(labName(t, { zone: "header", x: W - m.right - 26 - inner * 0.5, y: 12, w: inner * 0.5, h: 9, fontSize: 16, textTransform: "uppercase", letterSpacing: 0.5, align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: W - m.right - 26 - inner * 0.5, y: 21, w: inner * 0.5, h: 6, fontSize: 8.5, color: BRAND.muted, align: "end" });
       H_("text", {
         name: "Contact column",
         content: "{{laboratory.phone}}\n{{laboratory.email}}\n{{laboratory.address}}",
-        x: W - m.right - 55, y: 11, w: 55, h: 18, fontSize: 7.5, align: "end", color: BRAND.ink, lineHeight: 1.5,
+        x: m.left, y: 11, w: 55, h: 18, fontSize: 7.5, align: "center", verticalAlign: "middle", color: BRAND.ink, lineHeight: 1.5,
       });
       H_("line", { x: m.left, y: hh - 3, w: inner, h: 2, stroke: BRAND.purpleDeep, strokeWidth: 0.6 });
       F_("rect", { name: "Footer band", x: 0, y: fy + 4, w: W, h: fh - 4, fill: BRAND.purpleDeep, borderRadius: 0 });
       F_("barcode", { x: m.left, y: fy + 7, w: 34, h: fh - 10, color: "#FFFFFF" });
       F_("text", { name: "Disclaimer", content: "This report is electronically verified. Results relate only to the sample tested.", x: m.left + 38, y: fy + 7, w: inner - 76, h: fh - 10, fontSize: 7, color: "#EDE7FA", verticalAlign: "middle" });
-      F_("pageNumber", { x: W - m.right - 35, y: fy + 7, w: 35, h: fh - 10, align: "end", color: "#FFFFFF", verticalAlign: "middle" });
+      F_("pageNumber", { x: W - m.right - 35, y: fy + 7, w: 35, h: fh - 10, align: "center", color: "#FFFFFF", verticalAlign: "middle" });
       els.push(...bodyBlocks(t, { headBg: BRAND.purpleDeep, headText: "#FFFFFF", catBg: "#F1ECFB", primary: BRAND.purpleDeep }));
       // The corporate header row is dark — category text stays purple for contrast.
       const table = els.find((e) => e.type === "resultsTable");
@@ -240,12 +250,16 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "ribbon": {
-      els.push(createElement("rect", { name: "Side ribbon", zone: "background", x: 0, y: 0, w: 6, h: H, fill: BRAND.purpleDeep, borderRadius: 0 }));
-      els.push(createElement("rect", { name: "Ribbon accent", zone: "background", x: 6, y: 0, w: 1.6, h: H, fill: "#9B7FE0", borderRadius: 0 }));
-      els.push(labName(t, { zone: "header", x: m.left + 2, y: 11, w: inner - 34, h: 9, fontSize: 18 }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 2, y: 20.5, w: inner - 34, h: 5, fontSize: 8.5, color: BRAND.muted });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}}   |   {{laboratory.address}}", x: m.left + 2, y: 27, w: inner - 34, h: 5, fontSize: 8, color: BRAND.purple });
-      H_("image", { name: "Laboratory logo", role: "logo", x: W - m.right - 26, y: 8, w: 26, h: 26 });
+      // Flipped: the ribbon runs down the right edge, the logo sits on the
+      // left, and the name/subtitle/contact text moves to the right,
+      // right-aligned so it stays flush against the right margin instead of
+      // leaving a gap when the name is short.
+      els.push(createElement("rect", { name: "Side ribbon", zone: "background", x: W - 6, y: 0, w: 6, h: H, fill: BRAND.purpleDeep, borderRadius: 0 }));
+      els.push(createElement("rect", { name: "Ribbon accent", zone: "background", x: W - 7.6, y: 0, w: 1.6, h: H, fill: "#9B7FE0", borderRadius: 0 }));
+      H_("image", { name: "Laboratory logo", role: "logo", x: m.left + 2, y: 8, w: 26, h: 26 });
+      els.push(labName(t, { zone: "header", x: m.left + 34, y: 11, w: inner - 34, h: 9, fontSize: 18, align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 34, y: 20.5, w: inner - 34, h: 5, fontSize: 8.5, color: BRAND.muted, align: "end" });
+      H_("text", { name: "Contact", content: "{{laboratory.phone}}   |   {{laboratory.address}}", x: m.left + 34, y: 27, w: inner - 34, h: 5, fontSize: 8, color: BRAND.purple, align: "end" });
       H_("line", { x: m.left + 2, y: hh - 3, w: inner - 2, h: 2, stroke: "#C9B8F0", strokeWidth: 0.35 });
       F_("line", { x: m.left + 2, y: fy + 3, w: inner - 2, h: 2, stroke: "#C9B8F0", strokeWidth: 0.35 });
       F_("text", { name: "Footer text", content: "{{laboratory.name}}  ·  {{laboratory.website}}", x: m.left + 2, y: fy + 7, w: inner * 0.7, h: 5, fontSize: 7.5, color: BRAND.muted });
@@ -255,16 +269,16 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "gradient": {
-      // Not flipped: the diagonal is tall on the left, under the lab name,
-      // and shallow on the right, under the logo — flipping it moves the
-      // tall/colored part under the logo instead and leaves the name's
-      // subtitle sitting on plain white (unreadable, low-contrast text).
-      H_("bgShape", { name: "Header gradient", shape: "diagonal", x: 0, y: 0, w: W, h: hh - 2, fill: BRAND.purpleDeep, fill2: "#9B7FE0" });
-      els.push(labName(t, { zone: "header", x: m.left, y: 9, w: inner - 40, h: 9, fontSize: 18, color: "#FFFFFF" }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left, y: 18.5, w: inner - 40, h: 5, fontSize: 9, color: "#EDE7FA" });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.left, y: 24.5, w: inner - 60, h: 5, fontSize: 8, color: "#FFFFFF" });
-      H_("rect", { name: "Logo plate", x: W - m.right - 28, y: 5, w: 28, h: 28, fill: "#FFFFFF", borderRadius: 14 });
-      H_("image", { name: "Laboratory logo", role: "logo", x: W - m.right - 24, y: 9, w: 20, h: 20 });
+      // Flipped: logo on the left over the shallow/white side, lab name on
+      // the right — the diagonal itself is flipped (flip: true, same trick
+      // modernPurple uses) so its tall/colored side follows the name instead
+      // of leaving it sitting on plain white (unreadable, low-contrast text).
+      H_("bgShape", { name: "Header gradient", shape: "diagonal", x: 0, y: 0, w: W, h: hh - 2, fill: BRAND.purpleDeep, fill2: "#9B7FE0", flip: true });
+      H_("rect", { name: "Logo plate", x: m.left, y: 5, w: 28, h: 28, fill: "#FFFFFF", borderRadius: 14 });
+      H_("image", { name: "Laboratory logo", role: "logo", x: m.left + 4, y: 9, w: 20, h: 20 });
+      els.push(labName(t, { zone: "header", x: m.right + 40, y: 9, w: inner - 40, h: 9, fontSize: 18, color: "#FFFFFF", align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.right + 40, y: 18.5, w: inner - 40, h: 5, fontSize: 9, color: "#EDE7FA", align: "end" });
+      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.right + 60, y: 24.5, w: inner - 60, h: 5, fontSize: 8, color: "#FFFFFF", align: "end" });
       F_("rect", { name: "Footer band", x: 0, y: H - 10, w: W, h: 10, fill: BRAND.purpleDeep, borderRadius: 0 });
       F_("rect", { name: "Footer accent", x: 0, y: H - 11.2, w: W, h: 1.2, fill: "#9B7FE0", borderRadius: 0 });
       F_("text", { name: "Footer contact", content: "{{laboratory.website}}  ·  {{laboratory.email}}", x: m.left, y: H - 8, w: inner * 0.7, h: 6, fontSize: 7.5, color: "#FFFFFF", verticalAlign: "middle" });
@@ -275,15 +289,21 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "soft": {
-      els.push(createElement("circle", { name: "Soft circle", zone: "background", x: W - 48, y: -26, w: 72, h: 72, fill: BRAND.lavender }));
-      els.push(createElement("circle", { name: "Soft circle small", zone: "background", x: W - 30, y: 30, w: 16, h: 16, fill: "#EDE7FA" }));
-      els.push(createElement("circle", { name: "Soft circle bottom", zone: "background", x: -24, y: H - 40, w: 56, h: 56, fill: BRAND.lavender }));
-      H_("svg", { name: "Molecule", libraryId: "molecule", palette: "lavender", x: W - 40, y: 4, w: 26, h: 26 });
-      H_("rect", { name: "Logo plate", x: m.left, y: 8, w: 24, h: 24, fill: "#FFFFFF", borderColor: "#EDE7FA", borderWidth: 0.4, borderRadius: 6 });
-      H_("image", { name: "Laboratory logo", role: "logo", x: m.left + 2, y: 10, w: 20, h: 20 });
-      els.push(labName(t, { zone: "header", x: m.left + 29, y: 11, w: inner - 70, h: 9, fontSize: 17 }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 29, y: 20, w: inner - 70, h: 5, fontSize: 8.5, color: BRAND.muted });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.left + 29, y: 26, w: inner - 70, h: 5, fontSize: 8, color: BRAND.purple });
+      // Flipped: the molecule (and its soft-circle backdrop) moves to the
+      // left, the logo moves to the right, and the name/subtitle/contact
+      // text sits between them, right-aligned so it stays flush against
+      // the logo instead of leaving a gap when the name is short. The
+      // bottom accent circle mirrors to the bottom-right to keep the same
+      // diagonal balance as before.
+      els.push(createElement("circle", { name: "Soft circle", zone: "background", x: -24, y: -26, w: 72, h: 72, fill: BRAND.lavender }));
+      els.push(createElement("circle", { name: "Soft circle small", zone: "background", x: 14, y: 30, w: 16, h: 16, fill: "#EDE7FA" }));
+      els.push(createElement("circle", { name: "Soft circle bottom", zone: "background", x: W - 32, y: H - 40, w: 56, h: 56, fill: BRAND.lavender }));
+      H_("svg", { name: "Molecule", libraryId: "molecule", palette: "lavender", x: 14, y: 4, w: 26, h: 26 });
+      H_("rect", { name: "Logo plate", x: W - m.right - 24, y: 8, w: 24, h: 24, fill: "#FFFFFF", borderColor: "#EDE7FA", borderWidth: 0.4, borderRadius: 6 });
+      H_("image", { name: "Laboratory logo", role: "logo", x: W - m.right - 22, y: 10, w: 20, h: 20 });
+      els.push(labName(t, { zone: "header", x: m.left + 41, y: 11, w: inner - 70, h: 9, fontSize: 17, align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 41, y: 20, w: inner - 70, h: 5, fontSize: 8.5, color: BRAND.muted, align: "end" });
+      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.left + 41, y: 26, w: inner - 70, h: 5, fontSize: 8, color: BRAND.purple, align: "end" });
       H_("divider", { x: m.left, y: hh - 4, w: inner, h: 2, variant: "gradient", strokeWidth: 0.5 });
       F_("text", { name: "Footer contact", content: "{{laboratory.website}}  ·  {{laboratory.email}}", x: m.left + 20, y: fy + 8, w: inner * 0.6, h: 5, fontSize: 7.5, color: BRAND.muted });
       F_("pageNumber", { x: W - m.right - 35, y: fy + 8, w: 35, h: 5, align: "end", fontSize: 7.5 });
@@ -292,13 +312,17 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "science": {
-      els.push(labName(t, { zone: "header", x: m.left + 26, y: 9, w: inner - 90, h: 9, fontSize: 17 }));
-      H_("image", { name: "Laboratory logo", role: "logo", x: m.left, y: 8, w: 22, h: 22 });
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 26, y: 18, w: inner - 90, h: 5, fontSize: 8.5, color: BRAND.muted });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.left + 26, y: 24, w: inner - 90, h: 5, fontSize: 8, color: BRAND.purple });
-      H_("svg", { name: "Flask", libraryId: "flask", palette: "purple", x: W - m.right - 62, y: 7, w: 18, h: 22 });
-      H_("svg", { name: "Microscope", libraryId: "microscope", palette: "purple", x: W - m.right - 42, y: 5, w: 22, h: 25 });
-      H_("svg", { name: "Test tubes", libraryId: "testTubeRack", palette: "lavender", x: W - m.right - 19, y: 8, w: 19, h: 21 });
+      // Flipped: the lab illustrations move to the left (in reverse order,
+      // a true mirror), the logo moves to the right, and the name/subtitle/
+      // contact text sits between them, right-aligned so it stays flush
+      // against the logo instead of leaving a gap when the name is short.
+      H_("svg", { name: "Test tubes", libraryId: "testTubeRack", palette: "lavender", x: m.left, y: 8, w: 19, h: 21 });
+      H_("svg", { name: "Microscope", libraryId: "microscope", palette: "purple", x: m.left + 20, y: 5, w: 22, h: 25 });
+      H_("svg", { name: "Flask", libraryId: "flask", palette: "purple", x: m.left + 44, y: 7, w: 18, h: 22 });
+      els.push(labName(t, { zone: "header", x: m.left + 64, y: 9, w: inner - 90, h: 9, fontSize: 17, align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left + 64, y: 18, w: inner - 90, h: 5, fontSize: 8.5, color: BRAND.muted, align: "end" });
+      H_("text", { name: "Contact", content: "{{laboratory.phone}}  ·  {{laboratory.address}}", x: m.left + 64, y: 24, w: inner - 90, h: 5, fontSize: 8, color: BRAND.purple, align: "end" });
+      H_("image", { name: "Laboratory logo", role: "logo", x: W - m.right - 22, y: 8, w: 22, h: 22 });
       H_("divider", { x: m.left, y: hh - 4, w: inner, h: 2, variant: "gradient", strokeWidth: 0.6 });
       F_("svg", { name: "DNA band", libraryId: "dnaBand", palette: "lavender", x: W / 2 - 40, y: fy + 2, w: 80, h: 10, opacity: 0.6 });
       F_("text", { name: "Footer contact", content: "{{laboratory.website}}  ·  {{laboratory.email}}", x: m.left, y: fy + 13, w: inner * 0.7, h: 5, fontSize: 7.5, color: BRAND.muted });
@@ -308,18 +332,25 @@ function buildPreset(presetId, t, mirror = false, freeBadge = false) {
     }
 
     case "split": {
+      // Flipped: the colored logo block sits on the right instead of the
+      // left. The name/subtitle/contact text box still spans from the left
+      // margin up to the block (so short and long lab names both fit), but
+      // is right-aligned so the text itself sits flush against the block
+      // instead of leaving a visible gap when the name is short.
       const bw = Math.min(62, W * 0.3);
-      H_("rect", { name: "Logo block", x: 0, y: 0, w: bw, h: hh - 4, fill: BRAND.purpleDeep, borderRadius: 0 });
-      H_("rect", { name: "Logo plate", x: bw / 2 - 14, y: (hh - 4) / 2 - 14, w: 28, h: 28, fill: "#FFFFFF", borderRadius: 14 });
-      H_("image", { name: "Laboratory logo", role: "logo", x: bw / 2 - 10, y: (hh - 4) / 2 - 10, w: 20, h: 20 });
-      H_("svg", { name: "Block icon", libraryId: "microscopeLine", palette: "mono", role: "logoFallback", x: bw / 2 - 11, y: (hh - 4) / 2 - 11, w: 22, h: 22, opacity: 0 });
+      const bx = W - bw;
+      const textW = bx - 8 - m.left;
+      H_("rect", { name: "Logo block", x: bx, y: 0, w: bw, h: hh - 4, fill: BRAND.purpleDeep, borderRadius: 0 });
+      H_("rect", { name: "Logo plate", x: bx + bw / 2 - 14, y: (hh - 4) / 2 - 14, w: 28, h: 28, fill: "#FFFFFF", borderRadius: 14 });
+      H_("image", { name: "Laboratory logo", role: "logo", x: bx + bw / 2 - 10, y: (hh - 4) / 2 - 10, w: 20, h: 20 });
+      H_("svg", { name: "Block icon", libraryId: "microscopeLine", palette: "mono", role: "logoFallback", x: bx + bw / 2 - 11, y: (hh - 4) / 2 - 11, w: 22, h: 22, opacity: 0 });
       H_("rect", { name: "Header accent", x: 0, y: hh - 4, w: W, h: 1.2, fill: BRAND.purple, borderRadius: 0 });
-      els.push(labName(t, { zone: "header", x: bw + 8, y: 9, w: W - bw - 8 - m.right, h: 9, fontSize: 17 }));
-      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: bw + 8, y: 18.5, w: W - bw - 8 - m.right, h: 5, fontSize: 8.5, color: BRAND.muted });
-      H_("text", { name: "Contact", content: "{{laboratory.phone}}\n{{laboratory.address}}", x: bw + 8, y: 24.5, w: W - bw - 8 - m.right, h: 10, fontSize: 8, color: BRAND.purple, lineHeight: 1.4 });
-      F_("rect", { name: "Footer block", x: 0, y: H - 12, w: bw, h: 12, fill: BRAND.purpleDeep, borderRadius: 0 });
-      F_("pageNumber", { x: 4, y: H - 10, w: bw - 8, h: 8, align: "center", fontSize: 8, color: "#FFFFFF", verticalAlign: "middle" });
-      F_("text", { name: "Footer contact", content: "{{laboratory.website}}  ·  {{laboratory.email}}", x: bw + 8, y: H - 10, w: W - bw - 8 - m.right, h: 8, fontSize: 7.5, color: BRAND.muted, verticalAlign: "middle" });
+      els.push(labName(t, { zone: "header", x: m.left, y: 9, w: textW, h: 9, fontSize: 17, align: "end" }));
+      H_("text", { name: "Laboratory subtitle", content: "{{laboratory.subtitle}}", x: m.left, y: 18.5, w: textW, h: 5, fontSize: 8.5, color: BRAND.muted, align: "end" });
+      H_("text", { name: "Contact", content: "{{laboratory.phone}}\n{{laboratory.address}}", x: m.left, y: 24.5, w: textW, h: 10, fontSize: 8, color: BRAND.purple, lineHeight: 1.4, align: "end" });
+      F_("rect", { name: "Footer block", x: bx, y: H - 12, w: bw, h: 12, fill: BRAND.purpleDeep, borderRadius: 0 });
+      F_("pageNumber", { x: bx + 4, y: H - 10, w: bw - 8, h: 8, align: "center", fontSize: 8, color: "#FFFFFF", verticalAlign: "middle" });
+      F_("text", { name: "Footer contact", content: "{{laboratory.website}}  ·  {{laboratory.email}}", x: m.left, y: H - 10, w: textW, h: 8, fontSize: 7.5, color: BRAND.muted, verticalAlign: "middle", align: "end" });
       els.push(...bodyBlocks(t, { table: { headerAccent: BRAND.purpleDeep } }));
       break;
     }

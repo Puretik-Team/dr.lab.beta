@@ -59,10 +59,10 @@ const PRE_PRINTED_DESIGN = "prePrintedHeaderFooter";
 // Free-plan accounts can use the plain "Simple" design and the pre-printed
 // letterhead option; every other design needs a subscription.
 const FREE_DESIGNS = new Set(["minimal", PRE_PRINTED_DESIGN]);
-// "minimal" (the "Simple" design) already puts the logo on the left and
-// the lab's own details on the right in presets.js — no design needs the
-// generic left/right mirror anymore.
-const mirrorFor = () => false;
+// Only "modernPurple" ("Modern") mirrors — logo/name/DNA accent/wave all
+// move to the right. Every other design (including "minimal", which has
+// its own fixed logo-left/name-right layout in presets.js) is untouched.
+const mirrorFor = (design) => design === "modernPurple";
 
 // The Dr. Lab logo/wordmark ship as bundled asset URLs; templates embed
 // images as data URLs (they must print without the app's asset server), so
@@ -235,10 +235,13 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   const { token } = theme.useToken();
   const { t } = useTranslation();
   const { planType } = usePlan();
-  // Free-plan accounts get a small Dr. Lab co-brand badge next to their own
-  // logo on the "Simple" design — the same free-tier branding the classic
-  // theme already shows as a watermark (see main.js getWatermarkBase64).
+  // freeBadge still gates the free-plan UI restrictions below (locked paid
+  // designs/logos/colors). The Dr. Lab co-brand badge itself now shows on
+  // every plan, not just free — see showDrLabBadge.
   const freeBadge = planType === "FREE";
+  // Always show the small Dr. Lab co-brand badge next to the lab's own logo
+  // on the "Simple" design, regardless of plan.
+  const showDrLabBadge = true;
   const { setHeaderEmpty, headerHeight, setHeaderHeight, setFooterEmpty, footerHeight, setFooterHeight } = useAppStore();
   const fileRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -279,15 +282,15 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Preload the Dr. Lab badge image for free-plan accounts so every design
-  // preview (and the saved template) can embed it as a data URL.
+  // Preload the Dr. Lab badge image so every design preview (and the saved
+  // template) can embed it as a data URL.
   useEffect(() => {
-    if (!freeBadge || drLabBadgeData) return;
+    if (drLabBadgeData) return;
     drLabBadgeDataUrl()
       .then(setDrLabBadgeData)
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freeBadge]);
+  }, []);
 
   // Preloaded unconditionally (not just when a lab picks the "Dr. Lab" logo
   // tile) — the "Simple" design always shows it regardless of the logo
@@ -301,8 +304,8 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   }, []);
 
   const template = useMemo(
-    () => (settings ? buildSimpleTemplate(settings, existing, mirror, freeBadge, drLabBadgeData, drLabLogoData) : null),
-    [settings, existing, mirror, freeBadge, drLabBadgeData, drLabLogoData]
+    () => (settings ? buildSimpleTemplate(settings, existing, mirror, showDrLabBadge, drLabBadgeData, drLabLogoData) : null),
+    [settings, existing, mirror, showDrLabBadge, drLabBadgeData, drLabLogoData]
   );
   const previewHtml = useMemo(() => (template ? renderStaticPage(template, previewData(template, "short")) : ""), [template]);
 
@@ -425,7 +428,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               design={d}
               settings={settings}
               mirror={mirrorFor(d)}
-              freeBadge={freeBadge}
+              freeBadge={showDrLabBadge}
               drLabBadgeData={drLabBadgeData}
               drLabLogoData={drLabLogoData}
               selected={settings.design === d}
@@ -444,7 +447,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               design={d}
               settings={settings}
               mirror={mirrorFor(d)}
-              freeBadge={freeBadge}
+              freeBadge={showDrLabBadge}
               drLabBadgeData={drLabBadgeData}
               drLabLogoData={drLabLogoData}
               selected={settings.design === d}
