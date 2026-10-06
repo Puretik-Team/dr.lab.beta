@@ -11,10 +11,11 @@ import drLabBadge from "../../assets/light-name.png";
 import { usePlan } from "../../hooks/usePlan";
 import { getAccountLab, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
 import { readImage } from "./readImage";
+import { useAppStore } from "../../libs/appStore";
 import PageView from "./components/PageView";
 import StepWizard from "./components/StepWizard";
 import { PDFSettings } from "./theme/pdfSettings";
-import PDFPreviewCard from "./theme/PDFPreviewCard";
+import PDFPreviewCard, { SizeControls } from "./theme/PDFPreviewCard";
 import PopOverContent from "../SettingScreen/PopOverContent";
 
 // "Create your own design": pick a look, add a logo, pick a color, save.
@@ -201,6 +202,16 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   // designs/logos/colors). The Dr. Lab co-brand badge itself now shows on
   // every plan, not just free — see showDrLabBadge.
   const freeBadge = planType === "FREE";
+  const {
+    headerEmpty,
+    setHeaderEmpty,
+    headerHeight,
+    setHeaderHeight,
+    footerEmpty,
+    setFooterEmpty,
+    footerHeight,
+    setFooterHeight,
+  } = useAppStore();
   // Always show the small Dr. Lab co-brand badge next to the lab's own logo
   // on the "Simple" design, regardless of plan.
   const showDrLabBadge = true;
@@ -235,9 +246,10 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
       setExisting(simple || null);
       setCustomDefault(def && !def.content?.simple ? def : null);
       // No default template at all means the classic header/footer theme is
-      // what's actually printing — start on that tile instead of a design.
+      // what's actually printing — start on that tile instead of a design,
+      // even when an older saved design exists (it's just not the active one).
       const base = simple ? simple.content.simple : defaultSimpleSettings(getAccountLab());
-      setSettings(!simple && !def ? { ...base, design: UPLOAD_DESIGN } : base);
+      setSettings(!def ? { ...base, design: UPLOAD_DESIGN } : base);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -285,6 +297,14 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   // "Simple" always shows the Dr. Lab logo (see buildSimpleTemplate) — the
   // logo picker doesn't apply to it.
   const isMinimal = settings.design === "minimal";
+
+  // Persists a header/footer size choice the same way PDFPreviewCard's own
+  // controls do, so this screen and the Settings screen never disagree.
+  const setLocal = (key, val, setter) => {
+    if (val === null || val === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, val);
+    setter(val ?? null);
+  };
 
   const pickDrLab = async () => {
     try {
@@ -411,7 +431,23 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
       content: isUploadDesign ? (
         <div className="flex flex-col gap-6">
           <PDFSettings section="header" />
+          <SizeControls
+            label={t("HeaderHeight")}
+            emptyLabel={t("EmptyHeader")}
+            empty={headerEmpty}
+            onEmptyChange={(v) => setLocal("lab-header-empty", v ? "true" : "false", () => setHeaderEmpty(v))}
+            height={headerHeight}
+            onHeightChange={(v) => setLocal("lab-header-height", v, setHeaderHeight)}
+          />
           <PDFSettings section="footer" />
+          <SizeControls
+            label={t("FooterHeight")}
+            emptyLabel={t("EmptyFooter")}
+            empty={footerEmpty}
+            onEmptyChange={(v) => setLocal("lab-footer-empty", v ? "true" : "false", () => setFooterEmpty(v))}
+            height={footerHeight}
+            onHeightChange={(v) => setLocal("lab-footer-height", v, setFooterHeight)}
+          />
           <PDFSettings section="options" />
         </div>
       ) : (

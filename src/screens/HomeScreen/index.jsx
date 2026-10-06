@@ -29,6 +29,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { QuickActionsModal } from "./quickActionModal";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { send } from "../../control/renderer";
 import { useAppTheme } from "../../hooks/useAppThem";
 import { usePlan } from "../../hooks/usePlan";
@@ -79,6 +80,7 @@ const HomeScreen = () => {
     tableHeaderTextColor,
   } = useAppStore();
   const { planType } = usePlan();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const direction = i18n.dir();
   const { lang, setLang } = useLanguage();
@@ -416,7 +418,8 @@ const HomeScreen = () => {
               </div>
 
               <div
-                className="mt-4 p-2 rounded-[8px] shadow-lg flex justify-center items-center mx-auto"
+                className="mt-4 p-2 rounded-[8px] shadow-lg flex justify-center items-center mx-auto cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                onClick={() => navigate("/templates")}
                 style={{
                   background: appColors?.bgColor,
                   width: previewImage ? "fit-content" : 120,
