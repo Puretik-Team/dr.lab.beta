@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Input, Popover, Spin, message, theme } from "antd";
-import { CheckOutlined, CrownOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, Popconfirm, Popover, Spin, message, theme } from "antd";
+import { CheckOutlined, CrownOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons";
 import { LuFileText, LuBan, LuUpload, LuImage } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { resolvePageSize } from "../../templates/schema";
@@ -9,7 +9,7 @@ import { SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, default
 import drLabLogo from "../../assets/light-logo.png";
 import drLabBadge from "../../assets/light-name.png";
 import { usePlan } from "../../hooks/usePlan";
-import { getAccountLab, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
+import { deleteCatalogTemplate, downloadCatalogTemplate, getAccountLab, listCachedCatalog, listCatalog, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
 import { readImage } from "./readImage";
 import { useAppStore } from "../../libs/appStore";
 import PageView from "./components/PageView";
@@ -95,7 +95,7 @@ function LogoTile({ selected, onClick, children, label, locked }) {
   );
 }
 
-function DesignCard({ design, settings, selected, onClick, label, mirror, freeBadge, drLabBadgeData, drLabLogoData, locked }) {
+function DesignCard({ design, settings, selected, onClick, label, mirror, freeBadge, drLabBadgeData, drLabLogoData, locked, busy, downloaded, onDelete }) {
   const { token } = theme.useToken();
   const { t: tr } = useTranslation();
   const t = useMemo(
@@ -119,6 +119,41 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
     >
       <div style={{ position: "relative" }}>
         <PageView html={html} widthMm={size.width} heightMm={size.height} width={104} shadow={false} style={{ border: "1px solid #eee" }} />
+        {busy && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(255,255,255,0.65)",
+              borderRadius: 4,
+            }}
+          >
+            <LoadingOutlined style={{ fontSize: 26, color: token.colorPrimary }} />
+          </div>
+        )}
+        {downloaded && !busy && (
+          <span
+            title={tr("SD_Downloaded")}
+            style={{
+              position: "absolute",
+              top: 6,
+              left: 6,
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: token.colorSuccess,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+            }}
+          >
+            <CheckOutlined style={{ fontSize: 11, color: "#FFFFFF" }} />
+          </span>
+        )}
         {locked && (
           <div
             style={{
@@ -144,14 +179,48 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
       </div>
     </button>
   );
-  if (!locked) return card;
+  if (locked) {
+    return (
+      <Popover
+        placement="top"
+        content={<PopOverContent website={"https://www.puretik.com/ar"} email={"puretik@gmail.com"} phone={"07710553120"} limitExceededMessage={tr("SD_LockedDesign")} />}
+      >
+        {card}
+      </Popover>
+    );
+  }
+  if (!(downloaded && !busy && onDelete)) return card;
+  // The delete control is a sibling of the tile, not a child: the confirm
+  // popup is a React child of whatever renders it, so inside the tile's
+  // <button> its clicks would bubble up as a click on the tile itself
+  // (re-selecting and re-downloading the design it just removed).
   return (
-    <Popover
-      placement="top"
-      content={<PopOverContent website={"https://www.puretik.com/ar"} email={"puretik@gmail.com"} phone={"07710553120"} limitExceededMessage={tr("SD_LockedDesign")} />}
-    >
-      {card}
-    </Popover>
+    <div style={{ position: "relative", display: "flex" }}>
+      {React.cloneElement(card, { style: { ...card.props.style, width: "100%" } })}
+      <Popconfirm title={tr("SD_DeleteDownload")} okText={tr("SD_Remove")} okButtonProps={{ danger: true }} onConfirm={onDelete}>
+        <button
+          type="button"
+          title={tr("SD_Remove")}
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#FFFFFF",
+            border: `1px solid ${token.colorBorderSecondary}`,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            cursor: "pointer",
+          }}
+        >
+          <DeleteOutlined style={{ fontSize: 12, color: token.colorError }} />
+        </button>
+      </Popconfirm>
+    </div>
   );
 }
 
@@ -219,6 +288,10 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   const [loading, setLoading] = useState(true);
   const [existing, setExisting] = useState(null);
   const [customDefault, setCustomDefault] = useState(null);
+  // Designs published from the admin dashboard (empty when none/offline).
+  const [catalog, setCatalog] = useState([]);
+  const [downloading, setDownloading] = useState(null);
+  const [downloadedIds, setDownloadedIds] = useState(new Set());
   const [settings, setSettings] = useState(null);
   // Mirror the header layout (logo on the right, name following it) on
   // every design — virtually every lab name typed in is Arabic, so this is
@@ -254,6 +327,66 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Downloaded designs show up immediately (works offline); the server
+    // list then replaces them when it arrives.
+    listCachedCatalog()
+      .then((l) => setCatalog((cur) => (cur.length ? cur : l)))
+      .catch(() => {});
+    listCatalog()
+      .then((list) => {
+        setCatalog(list);
+        // The picked design may have been updated on the server since it was
+        // saved; use the newer layout so a Save here can't revert it.
+        setSettings((cur) => {
+          const m = /^catalog:(\d+)$/.exec(cur?.design || "");
+          const e = m && list.find((c) => c.id === Number(m[1]));
+          return e && (e.version || 1) > (cur.catalogVersion || 0)
+            ? { ...cur, catalog: e.configJson, catalogVersion: e.version }
+            : cur;
+        });
+        refreshDownloaded();
+      })
+      .catch(() => {});
+    refreshDownloaded();
+  }, []);
+
+  const refreshDownloaded = () =>
+    listCachedCatalog()
+      .then((l) => setDownloadedIds(new Set(l.map((c) => c.id))))
+      .catch(() => {});
+
+  // Removes the local download and its tile from the list. A design already
+  // saved as the lab's report design keeps printing from its own embedded
+  // copy. It comes back in the list the next time the screen loads online.
+  const removeCatalog = async (entry) => {
+    try {
+      await deleteCatalogTemplate(entry.id);
+      setCatalog((list) => list.filter((c) => c.id !== entry.id));
+      // If it was the picked design, fall back to the plain one instead of
+      // leaving a selection that no longer has a tile.
+      if (settings?.design === `catalog:${entry.id}`) set({ design: "minimal", catalog: undefined });
+      await refreshDownloaded();
+    } catch (e) {
+      message.error(t("SD_Error"));
+    }
+  };
+
+  // Picking a catalog design downloads it into the local database first, so
+  // it keeps working (and listing) offline, then makes it the selected design.
+  const pickCatalog = async (entry) => {
+    setDownloading(entry.id);
+    try {
+      await downloadCatalogTemplate(entry);
+      set({ design: `catalog:${entry.id}`, catalog: entry.configJson, catalogVersion: entry.version });
+      await refreshDownloaded();
+    } catch (e) {
+      message.error(t("SD_Error"));
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   // Preload the Dr. Lab badge image so every design preview (and the saved
   // template) can embed it as a data URL.
@@ -398,13 +531,13 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               drLabBadgeData={drLabBadgeData}
               drLabLogoData={drLabLogoData}
               selected={settings.design === d}
-              onClick={() => set({ design: d })}
+              onClick={() => set({ design: d, catalog: undefined })}
               label={t(`SD_D_${d}`)}
             />
           ))}
           <UploadDesignCard
             selected={isUploadDesign}
-            onClick={() => set({ design: UPLOAD_DESIGN })}
+            onClick={() => set({ design: UPLOAD_DESIGN, catalog: undefined })}
             label={t("SD_D_uploadHeaderFooter")}
           />
           {SIMPLE_DESIGNS.filter((d) => !FREE_DESIGNS.has(d)).map((d) => (
@@ -417,9 +550,27 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               drLabBadgeData={drLabBadgeData}
               drLabLogoData={drLabLogoData}
               selected={settings.design === d}
-              onClick={() => set({ design: d })}
+              onClick={() => set({ design: d, catalog: undefined })}
               label={t(`SD_D_${d}`)}
               locked={freeBadge}
+            />
+          ))}
+          {catalog.map((c) => (
+            <DesignCard
+              key={`catalog:${c.id}`}
+              design={`catalog:${c.id}`}
+              settings={{ ...settings, catalog: c.configJson }}
+              mirror={false}
+              freeBadge={showDrLabBadge}
+              drLabBadgeData={drLabBadgeData}
+              drLabLogoData={drLabLogoData}
+              selected={settings.design === `catalog:${c.id}`}
+              onClick={() => (downloading ? null : pickCatalog(c))}
+              label={c.name}
+              locked={freeBadge}
+              busy={downloading === c.id}
+              downloaded={downloadedIds.has(c.id)}
+              onDelete={() => removeCatalog(c)}
             />
           ))}
         </div>

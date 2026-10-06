@@ -1,7 +1,7 @@
 // "Simple mode": turns a handful of choices (design, color, logo,
 // lab details) into a full template. The choices are stored on the template
 // (content.simple) so the simple screen can reopen them later.
-const { createTemplate, BRAND } = require("./schema");
+const { createTemplate, normalizeTemplate, BRAND } = require("./schema");
 const { buildPreset } = require("./presets");
 const { mix, renderLibrarySvg, svgToDataUrl } = require("./svgLibrary");
 
@@ -93,10 +93,18 @@ function defaultSimpleSettings(accountLab = {}) {
   };
 }
 
+// Designs downloaded from the server catalog use the same logo / lab-detail
+// settings as the built-in ones; the design itself comes from settings.catalog
+// (the template JSON) instead of a preset. Brand-palette colors in it follow
+// the color picked in the wizard, like the built-in designs.
+const isCatalogDesign = (settings) => String(settings.design || "").startsWith("catalog:") && !!settings.catalog;
+
 function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadge = false, drLabBadgeSrc = "", drLabLogoSrc = "") {
+  const catalog = isCatalogDesign(settings) ? normalizeTemplate(settings.catalog) : null;
   const t = createTemplate({
-    name: existing?.name || "My report design",
-    description: "Made with the simple report designer",
+    name: existing?.name || catalog?.name || "My report design",
+    description: catalog ? "Downloaded design" : "Made with the simple report designer",
+    ...(catalog ? { page: catalog.page } : {}),
     // Labels are always English; the data filled in (names, notes) is often
     // Arabic, which the engine lays out with per-value text direction.
     language: "en",
@@ -107,7 +115,8 @@ function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadg
   // that's almost always when the lab name is Arabic/Kurdish too.
   // freeBadge co-brands the report with a small Dr. Lab logo beside the
   // lab's own — shown for accounts on the free plan, the "minimal" design only.
-  let els = buildPreset(settings.design, t, mirror, freeBadge && !!drLabBadgeSrc);
+  let els = catalog ? catalog.elements.map((e) => ({ ...e })) : buildPreset(settings.design, t, mirror, freeBadge && !!drLabBadgeSrc);
+  if (catalog) t.content.watermarkText = catalog.content?.watermarkText || "";
   // "Simple" always shows the Dr. Lab logo, regardless of what the lab
   // picked — the logo choice step has no effect on this design.
   const forceDrLabLogo = settings.design === "minimal" && !!drLabLogoSrc;
@@ -137,4 +146,4 @@ function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadg
   };
 }
 
-module.exports = { SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo };
+module.exports = { isCatalogDesign, SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo };

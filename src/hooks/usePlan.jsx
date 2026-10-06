@@ -5,6 +5,7 @@ import { message } from "antd";
 import { create } from "zustand";
 import useInitHeaderImage from "./useInitHeaderImage";
 import { send, fireAndForget } from "../control/renderer";
+import { syncCatalogUpdates } from "../screens/TemplatesScreen/api";
 import { useEffect } from "react";
 
 const usePlanState = create((set) => ({
@@ -156,12 +157,19 @@ export const usePlan = () => {
         },
       });
 
+      // Pull in newer versions of any report designs downloaded from the
+      // template catalog (no-op when offline).
+      syncCatalogUpdates();
+
       await fetchHeader(parsedUser);
     }
   };
 
   useEffect(() => {
-    const onOnline = () => fireAndForget({ query: "syncNow" });
+    const onOnline = () => {
+      fireAndForget({ query: "syncNow" });
+      syncCatalogUpdates({ force: true });
+    };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
   }, []);

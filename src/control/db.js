@@ -110,6 +110,7 @@ class LabDB {
       this.migrateVisitsTableWithDoctorForeignKey();
       await this.checkAndAddSyncColumns();
       this.checkAndAddReportTemplatesTable();
+      this.checkAndAddCatalogTemplatesTable();
       console.log(
         "LabDB initialized, db object:",
         this.db ? "exists" : "does not exist"
@@ -446,6 +447,71 @@ class LabDB {
     } catch (error) {
       log.error("[LabDB] Error creating report_templates table:", error && error.message);
     }
+  }
+
+  // Designs downloaded from the server's template catalog (picked in the
+  // report designer). Local copies so a chosen design keeps working and
+  // listing offline. Not synced — each PC downloads what it picks.
+  checkAndAddCatalogTemplatesTable() {
+    try {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS catalog_templates(
+          remote_id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT,
+          language TEXT,
+          schema_version INTEGER NOT NULL DEFAULT 1,
+          version INTEGER NOT NULL DEFAULT 1,
+          config_json TEXT NOT NULL,
+          downloaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+    } catch (error) {
+      log.error("[LabDB] Error creating catalog_templates table:", error && error.message);
+    }
+  }
+
+  getCatalogTemplates() {
+    const rows = this.db.prepare(`SELECT * FROM catalog_templates ORDER BY name`).all();
+    const data = [];
+    for (const r of rows) {
+      try {
+        data.push({
+          id: r.remote_id,
+          name: r.name,
+          category: r.category || "",
+          language: r.language || "en",
+          schemaVersion: r.schema_version,
+          version: r.version,
+          configJson: JSON.parse(r.config_json),
+        });
+      } catch (_) {}
+    }
+    return { success: true, data };
+  }
+
+  // Removes only the local download — a design already saved as the lab's
+  // report design embeds its own copy, so it keeps printing.
+  deleteCatalogTemplate(id) {
+    const info = this.db.prepare(`DELETE FROM catalog_templates WHERE remote_id = ?`).run(Number(id));
+    return { success: info.changes > 0 };
+  }
+
+  // Insert-or-update by the server's id, so picking a design again refreshes
+  // the local copy to the latest published version.
+  saveCatalogTemplate(entry) {
+    const { id, name, category = "", language = "en", schemaVersion = 1, version = 1, configJson } = entry || {};
+    if (!id || !configJson) return { success: false, error: "Invalid catalog template" };
+    this.db
+      .prepare(
+        `INSERT INTO catalog_templates (remote_id, name, category, language, schema_version, version, config_json, downloaded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(remote_id) DO UPDATE SET name = excluded.name, category = excluded.category,
+           language = excluded.language, schema_version = excluded.schema_version,
+           version = excluded.version, config_json = excluded.config_json, downloaded_at = excluded.downloaded_at`
+      )
+      .run(Number(id), String(name || "Template"), category, language, Number(schemaVersion) || 1, Number(version) || 1, JSON.stringify(configJson));
+    return { success: true };
   }
 
   rowToReportTemplate(row) {

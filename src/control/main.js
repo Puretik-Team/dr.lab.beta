@@ -695,6 +695,23 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
       break;
     }
 
+    // Designs downloaded from the server's template catalog (see db.js).
+    case "getCatalogTemplates":
+    case "saveCatalogTemplate":
+    case "deleteCatalogTemplate": {
+      try {
+        let resp;
+        if (arg.query === "getCatalogTemplates") resp = labDB.getCatalogTemplates();
+        else if (arg.query === "saveCatalogTemplate") resp = labDB.saveCatalogTemplate(arg.data);
+        else resp = labDB.deleteCatalogTemplate(arg.id);
+        event.reply(`asynchronous-reply-${arg.query}`, resp);
+      } catch (error) {
+        log.error(`[TEMPLATE_ERROR] ${arg.query}:`, error.message);
+        event.reply(`asynchronous-reply-${arg.query}`, { success: false, error: error.message });
+      }
+      break;
+    }
+
     // data: { template, mode, sampleData?, visit?, labInfo?, openOnly? } —
     // renders a PDF and opens it (openOnly skips the save dialog).
     case "exportReportTemplatePDF": {
