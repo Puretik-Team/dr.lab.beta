@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Input, Select, Space } from "antd";
+import { Input, Select } from "antd";
 import { useTranslation } from "react-i18next";
 import { splitAge, birthFromAge } from "../../helper/age";
 
@@ -33,7 +33,16 @@ export default function AgeInput({ birth, onChange, placeholder }) {
   };
 
   return (
-    <Space.Compact style={{ width: "100%", minWidth: 150, display: "flex" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(72px, 1fr) minmax(104px, 1fr)",
+        gap: 8,
+        width: "100%",
+        minWidth: 190,
+      }}
+    >
+      <style>{`.age-input-number::-webkit-outer-spin-button,.age-input-number::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.age-input-number{-moz-appearance:textfield}`}</style>
       <Input
         type="number"
         min={0}
@@ -41,13 +50,13 @@ export default function AgeInput({ birth, onChange, placeholder }) {
         onChange={(e) => update(e.target.value, unit)}
         placeholder="0"
         aria-label={placeholder}
-        style={{ flex: "1 1 64px", minWidth: 64, paddingInline: 8 }}
         className="age-input-number"
+        style={{ width: "100%", minWidth: 72 }}
       />
       <Select
         value={unit}
         onChange={(u) => update(value, u)}
-        style={{ flex: "0 1 100px", minWidth: 84 }}
+        style={{ width: "100%", minWidth: 104 }}
         popupMatchSelectWidth={false}
         options={[
           { value: "year", label: t("AgeYears") },
@@ -55,6 +64,6 @@ export default function AgeInput({ birth, onChange, placeholder }) {
           { value: "day", label: t("AgeDays") },
         ]}
       />
-    </Space.Compact>
+    </div>
   );
 }
