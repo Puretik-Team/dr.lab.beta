@@ -33,7 +33,7 @@ export default function AgeInput({ birth, onChange, placeholder }) {
   };
 
   return (
-    <Space.Compact style={{ width: "100%", display: "flex" }}>
+    <Space.Compact style={{ width: "100%", minWidth: 150, display: "flex" }}>
       <Input
         type="number"
         min={0}
@@ -41,12 +41,13 @@ export default function AgeInput({ birth, onChange, placeholder }) {
         onChange={(e) => update(e.target.value, unit)}
         placeholder="0"
         aria-label={placeholder}
-        style={{ flex: 1, minWidth: 0 }}
+        style={{ flex: "1 1 64px", minWidth: 64, paddingInline: 8 }}
+        className="age-input-number"
       />
       <Select
         value={unit}
         onChange={(u) => update(value, u)}
-        style={{ width: 108, flexShrink: 0 }}
+        style={{ flex: "0 1 100px", minWidth: 84 }}
         popupMatchSelectWidth={false}
         options={[
           { value: "year", label: t("AgeYears") },
