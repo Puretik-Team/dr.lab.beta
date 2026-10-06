@@ -99,7 +99,7 @@ const PatientForm = () => {
             />
           </Space>
         </Col>
-        <Col span={10}>
+        <Col span={24}>
           <Space style={{ width: "100%" }} direction="vertical" size={4}>
             <Text>{t("Age")}</Text>
             <AgeInput
@@ -116,7 +116,7 @@ const PatientForm = () => {
             /> */}
           </Space>
         </Col>
-        <Col span={14}>
+        <Col span={24}>
           <Space style={{ width: "100%" }} direction="vertical" size={4}>
             <Text>{t("PhoneNumber")}</Text>
             <Input

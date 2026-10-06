@@ -35,11 +35,10 @@ export default function AgeInput({ birth, onChange, placeholder }) {
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(72px, 1fr) minmax(104px, 1fr)",
+        display: "flex",
+        flexWrap: "wrap",
         gap: 8,
         width: "100%",
-        minWidth: 190,
       }}
     >
       <style>{`.age-input-number::-webkit-outer-spin-button,.age-input-number::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.age-input-number{-moz-appearance:textfield}`}</style>
@@ -51,12 +50,12 @@ export default function AgeInput({ birth, onChange, placeholder }) {
         placeholder="0"
         aria-label={placeholder}
         className="age-input-number"
-        style={{ width: "100%", minWidth: 72 }}
+        style={{ flex: "1 1 72px", minWidth: 72, width: "auto" }}
       />
       <Select
         value={unit}
         onChange={(u) => update(value, u)}
-        style={{ width: "100%", minWidth: 104 }}
+        style={{ flex: "1 1 104px", minWidth: 104 }}
         popupMatchSelectWidth={false}
         options={[
           { value: "year", label: t("AgeYears") },

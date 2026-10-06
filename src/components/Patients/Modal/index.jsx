@@ -148,7 +148,7 @@ export const PureModal = () => {
               />
             </Space>
           </Col>
-          <Col span={10}>
+          <Col span={24}>
             <Space style={{ width: "100%" }} direction="vertical" size={4}>
               <Text>{t("Age")}</Text>
               <AgeInput birth={birth} onChange={setBirth} placeholder={t("EnterAge")} />
@@ -160,7 +160,7 @@ export const PureModal = () => {
               /> */}
             </Space>
           </Col>
-          <Col span={14}>
+          <Col span={24}>
             <Space style={{ width: "100%" }} direction="vertical" size={4}>
               <Text>{t("PhoneNumber")}</Text>
               <Input
