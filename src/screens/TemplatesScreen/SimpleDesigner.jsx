@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Input, InputNumber, Popover, Slider, Spin, message, theme } from "antd";
+import { Alert, Button, Input, Popover, Spin, message, theme } from "antd";
 import { CheckOutlined, CrownOutlined } from "@ant-design/icons";
-import { LuFileText, LuBan, LuUpload } from "react-icons/lu";
+import { LuFileText, LuBan, LuUpload, LuImage } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { resolvePageSize } from "../../templates/schema";
 import { renderStaticPage } from "../../templates/engine";
@@ -11,54 +11,20 @@ import drLabBadge from "../../assets/light-name.png";
 import { usePlan } from "../../hooks/usePlan";
 import { getAccountLab, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
 import { readImage } from "./readImage";
-import { useAppStore } from "../../libs/appStore";
 import PageView from "./components/PageView";
 import StepWizard from "./components/StepWizard";
 import { PDFSettings } from "./theme/pdfSettings";
 import PDFPreviewCard from "./theme/PDFPreviewCard";
 import PopOverContent from "../SettingScreen/PopOverContent";
 
-const MIN_HEIGHT = 5;
-const MAX_HEIGHT = 120;
-
-// Just the reserved-space slider, no "Leave Empty" switch — picking this
-// design tile already means the header/footer stays empty.
-function HeightOnly({ label, height, onHeightChange }) {
-  const { t } = useTranslation();
-  const effectiveHeight = height ?? 30;
-  return (
-    <div className="flex items-center gap-2">
-      <b className="text-[12px] whitespace-nowrap">{label}</b>
-      <Slider
-        min={MIN_HEIGHT}
-        max={MAX_HEIGHT}
-        value={effectiveHeight}
-        onChange={onHeightChange}
-        style={{ flex: 1 }}
-        tooltip={{ formatter: (v) => `${v}mm` }}
-      />
-      <InputNumber
-        value={height}
-        onChange={onHeightChange}
-        placeholder={t("Auto")}
-        min={MIN_HEIGHT}
-        max={MAX_HEIGHT}
-        size="small"
-        style={{ width: 90 }}
-        addonAfter="mm"
-      />
-    </div>
-  );
-}
-
 // "Create your own design": pick a look, add a logo, pick a color, save.
-// The last tile in step one isn't a schema-based design at all — it's for
-// labs that already print on pre-printed letterhead paper: no image upload,
-// just reserved blank space at the top/bottom so nothing overlaps it.
-const PRE_PRINTED_DESIGN = "prePrintedHeaderFooter";
-// Free-plan accounts can use the plain "Simple" design and the pre-printed
-// letterhead option; every other design needs a subscription.
-const FREE_DESIGNS = new Set(["minimal", PRE_PRINTED_DESIGN]);
+// The last tile in step one isn't a schema-based design at all — it's the
+// classic report (your own header/footer images), folded in here so there's
+// only one place to set up how reports look.
+const UPLOAD_DESIGN = "uploadHeaderFooter";
+// Free-plan accounts can use the plain "Simple" design and the header/footer
+// upload option; every other design needs a subscription.
+const FREE_DESIGNS = new Set(["minimal", UPLOAD_DESIGN]);
 // Only "modernPurple" ("Modern") mirrors — logo/name/DNA accent/wave all
 // move to the right. Every other design (including "minimal", which has
 // its own fixed logo-left/name-right layout in presets.js) is untouched.
@@ -188,11 +154,9 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
   );
 }
 
-// This tile can't render a live schema preview — it illustrates the idea
-// instead: a page with dashed reserved bands at the top and bottom (where
-// the lab's pre-printed letterhead already has its own header/footer) and
-// nothing but the results table in between.
-function PrePrintedDesignCard({ selected, onClick, label }) {
+// The upload tile can't render a live schema preview — it just shows a
+// placeholder header/footer illustration, same size as the other tiles.
+function UploadDesignCard({ selected, onClick, label }) {
   const { token } = theme.useToken();
   return (
     <button
@@ -209,20 +173,18 @@ function PrePrintedDesignCard({ selected, onClick, label }) {
         style={{
           width: 104,
           height: 147,
-          border: `1px solid ${token.colorBorderSecondary}`,
+          border: `1px dashed ${token.colorBorderSecondary}`,
           borderRadius: 4,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          color: token.colorTextSecondary,
         }}
       >
-        <div style={{ height: 28, borderBottom: `1px dashed ${token.colorBorderSecondary}`, background: token.colorFillTertiary }} />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, padding: "8px 6px" }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 4, borderRadius: 2, background: token.colorFillSecondary }} />
-          ))}
-        </div>
-        <div style={{ height: 20, borderTop: `1px dashed ${token.colorBorderSecondary}`, background: token.colorFillTertiary }} />
+        <LuImage size={22} />
+        <LuUpload size={16} />
       </div>
       <div className="sd-design-label" style={{ color: selected ? token.colorPrimary : token.colorText }}>
         {selected && <CheckOutlined />} {label}
@@ -242,7 +204,6 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   // Always show the small Dr. Lab co-brand badge next to the lab's own logo
   // on the "Simple" design, regardless of plan.
   const showDrLabBadge = true;
-  const { setHeaderEmpty, headerHeight, setHeaderHeight, setFooterEmpty, footerHeight, setFooterHeight } = useAppStore();
   const fileRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [existing, setExisting] = useState(null);
@@ -276,7 +237,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
       // No default template at all means the classic header/footer theme is
       // what's actually printing — start on that tile instead of a design.
       const base = simple ? simple.content.simple : defaultSimpleSettings(getAccountLab());
-      setSettings(!simple && !def ? { ...base, design: PRE_PRINTED_DESIGN } : base);
+      setSettings(!simple && !def ? { ...base, design: UPLOAD_DESIGN } : base);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -320,25 +281,10 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   // isn't mistaken for an uploaded one when the screen is reopened.
   const isDrLab = settings.logoChoice === "drlab";
   const isUploaded = !!settings.logo && !settings.logo.startsWith("icon:") && !isDrLab;
-  const isPrePrinted = settings.design === PRE_PRINTED_DESIGN;
+  const isUploadDesign = settings.design === UPLOAD_DESIGN;
   // "Simple" always shows the Dr. Lab logo (see buildSimpleTemplate) — the
   // logo picker doesn't apply to it.
   const isMinimal = settings.design === "minimal";
-
-  // Persists a header/footer size choice the same way PDFPreviewCard's own
-  // controls do, so this tile and the Settings screen never disagree.
-  const setLocal = (key, val, setter) => {
-    if (val === null || val === undefined) localStorage.removeItem(key);
-    else localStorage.setItem(key, val);
-    setter(val ?? null);
-  };
-
-  // Picking this tile means "leave it empty" — no separate toggle needed.
-  const pickPrePrinted = () => {
-    set({ design: PRE_PRINTED_DESIGN });
-    setLocal("lab-header-empty", "true", () => setHeaderEmpty(true));
-    setLocal("lab-footer-empty", "true", () => setFooterEmpty(true));
-  };
 
   const pickDrLab = async () => {
     try {
@@ -350,7 +296,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     }
   };
   const size = resolvePageSize(template.page);
-  const inUse = (isPrePrinted ? activeKind === "theme" : activeKind === "design") && !dirty;
+  const inUse = (isUploadDesign ? activeKind === "theme" : activeKind === "design") && !dirty;
 
   const pickLogo = async (e) => {
     const f = e.target.files?.[0];
@@ -436,10 +382,10 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               label={t(`SD_D_${d}`)}
             />
           ))}
-          <PrePrintedDesignCard
-            selected={isPrePrinted}
-            onClick={pickPrePrinted}
-            label={t("SD_D_prePrinted")}
+          <UploadDesignCard
+            selected={isUploadDesign}
+            onClick={() => set({ design: UPLOAD_DESIGN })}
+            label={t("SD_D_uploadHeaderFooter")}
           />
           {SIMPLE_DESIGNS.filter((d) => !FREE_DESIGNS.has(d)).map((d) => (
             <DesignCard
@@ -461,19 +407,11 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     },
     {
       title: t("SD_Step2"),
-      hint: isPrePrinted ? t("SD_HintPrePrinted") : t("SD_Hint2"),
-      content: isPrePrinted ? (
+      hint: isUploadDesign ? t("SD_HintUpload") : t("SD_Hint2"),
+      content: isUploadDesign ? (
         <div className="flex flex-col gap-6">
-          <HeightOnly
-            label={t("HeaderHeight")}
-            height={headerHeight}
-            onHeightChange={(v) => setLocal("lab-header-height", v, setHeaderHeight)}
-          />
-          <HeightOnly
-            label={t("FooterHeight")}
-            height={footerHeight}
-            onHeightChange={(v) => setLocal("lab-footer-height", v, setFooterHeight)}
-          />
+          <PDFSettings section="header" />
+          <PDFSettings section="footer" />
           <PDFSettings section="options" />
         </div>
       ) : (
@@ -574,8 +512,8 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     },
     {
       title: t("SW_Finish"),
-      hint: isPrePrinted ? t("TH_Hint4") : t("SD_Hint4"),
-      content: isPrePrinted ? null : (
+      hint: isUploadDesign ? t("TH_Hint4") : t("SD_Hint4"),
+      content: isUploadDesign ? null : (
         <div className="flex flex-col gap-3 items-start">
           {customDefault && <Alert type="info" showIcon message={t("SD_CustomActive")} />}
           <Button size="large" loading={opening} onClick={example} icon={<LuFileText />}>
@@ -596,19 +534,19 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
           type="primary"
           size="large"
           loading={saving}
-          onClick={isPrePrinted ? useTheme : save}
+          onClick={isUploadDesign ? useTheme : save}
           icon={<CheckOutlined />}
           className="sd-save"
         >
-          {isPrePrinted ? t("TH_Use") : t("SD_Save")}
+          {isUploadDesign ? t("TH_Use") : t("SD_Save")}
         </Button>
       }
       preview={
         <>
           <div className="sd-status" style={{ color: inUse ? token.colorSuccess : token.colorTextSecondary }}>
-            {inUse ? `✓ ${t(isPrePrinted ? "TH_InUse" : "SD_InUse")}` : t(isPrePrinted ? "TH_NotInUse" : "SD_NotInUse")}
+            {inUse ? `✓ ${t(isUploadDesign ? "TH_InUse" : "SD_InUse")}` : t(isUploadDesign ? "TH_NotInUse" : "SD_NotInUse")}
           </div>
-          {isPrePrinted ? (
+          {isUploadDesign ? (
             <PDFPreviewCard controls="none" previewW={360} />
           ) : (
             <PageView html={previewHtml} widthMm={size.width} heightMm={size.height} width={360} />
