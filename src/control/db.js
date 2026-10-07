@@ -466,13 +466,18 @@ class LabDB {
           downloaded_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `);
+      // Added after the first release of this table — additive only.
+      const cols = this.db.prepare(`PRAGMA table_info(catalog_templates)`).all().map((c) => c.name);
+      if (!cols.includes("is_free")) this.db.exec(`ALTER TABLE catalog_templates ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0`);
+      if (!cols.includes("legacy_key")) this.db.exec(`ALTER TABLE catalog_templates ADD COLUMN legacy_key TEXT`);
+      if (!cols.includes("sort_order")) this.db.exec(`ALTER TABLE catalog_templates ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
     } catch (error) {
       log.error("[LabDB] Error creating catalog_templates table:", error && error.message);
     }
   }
 
   getCatalogTemplates() {
-    const rows = this.db.prepare(`SELECT * FROM catalog_templates ORDER BY name`).all();
+    const rows = this.db.prepare(`SELECT * FROM catalog_templates ORDER BY is_free DESC, sort_order, name`).all();
     const data = [];
     for (const r of rows) {
       try {
@@ -483,6 +488,9 @@ class LabDB {
           language: r.language || "en",
           schemaVersion: r.schema_version,
           version: r.version,
+          isFree: !!r.is_free,
+          legacyKey: r.legacy_key || null,
+          sortOrder: r.sort_order || 0,
           configJson: JSON.parse(r.config_json),
         });
       } catch (_) {}
@@ -490,27 +498,24 @@ class LabDB {
     return { success: true, data };
   }
 
-  // Removes only the local download — a design already saved as the lab's
-  // report design embeds its own copy, so it keeps printing.
-  deleteCatalogTemplate(id) {
-    const info = this.db.prepare(`DELETE FROM catalog_templates WHERE remote_id = ?`).run(Number(id));
-    return { success: info.changes > 0 };
-  }
-
   // Insert-or-update by the server's id, so picking a design again refreshes
   // the local copy to the latest published version.
   saveCatalogTemplate(entry) {
-    const { id, name, category = "", language = "en", schemaVersion = 1, version = 1, configJson } = entry || {};
+    const { id, name, category = "", language = "en", schemaVersion = 1, version = 1, isFree = false, legacyKey = null, sortOrder = 0, configJson } = entry || {};
     if (!id || !configJson) return { success: false, error: "Invalid catalog template" };
     this.db
       .prepare(
-        `INSERT INTO catalog_templates (remote_id, name, category, language, schema_version, version, config_json, downloaded_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `INSERT INTO catalog_templates (remote_id, name, category, language, schema_version, version, is_free, legacy_key, sort_order, config_json, downloaded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
          ON CONFLICT(remote_id) DO UPDATE SET name = excluded.name, category = excluded.category,
            language = excluded.language, schema_version = excluded.schema_version,
-           version = excluded.version, config_json = excluded.config_json, downloaded_at = excluded.downloaded_at`
+           version = excluded.version, is_free = excluded.is_free, legacy_key = excluded.legacy_key,
+           sort_order = excluded.sort_order, config_json = excluded.config_json, downloaded_at = excluded.downloaded_at`
       )
-      .run(Number(id), String(name || "Template"), category, language, Number(schemaVersion) || 1, Number(version) || 1, JSON.stringify(configJson));
+      .run(
+        Number(id), String(name || "Template"), category, language, Number(schemaVersion) || 1, Number(version) || 1,
+        isFree ? 1 : 0, legacyKey || null, Number(sortOrder) || 0, JSON.stringify(configJson)
+      );
     return { success: true };
   }
 

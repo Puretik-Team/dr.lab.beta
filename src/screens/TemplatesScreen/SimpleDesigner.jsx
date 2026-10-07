@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Input, Popconfirm, Popover, Spin, message, theme } from "antd";
-import { CheckOutlined, CrownOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, Popover, Spin, message, theme } from "antd";
+import { CheckOutlined, CrownOutlined, LoadingOutlined, LockFilled } from "@ant-design/icons";
 import { LuFileText, LuBan, LuUpload, LuImage } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { resolvePageSize } from "../../templates/schema";
 import { renderStaticPage } from "../../templates/engine";
-import { SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo } from "../../templates/simple";
+import { SIMPLE_COLORS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, forcesDrLabLogo, resolveLogo } from "../../templates/simple";
 import drLabLogo from "../../assets/light-logo.png";
-import drLabBadge from "../../assets/light-name.png";
+import { drLabBadgeDataUrl, drLabLogoDataUrl } from "./drlabAssets";
 import { usePlan } from "../../hooks/usePlan";
-import { deleteCatalogTemplate, downloadCatalogTemplate, getAccountLab, listCachedCatalog, listCatalog, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
+import { downloadCatalogTemplate, getAccountLab, markDesignChosen, listCachedCatalog, listCatalog, listTemplates, previewData, saveTemplate, setDefaultTemplate, showExample } from "./api";
 import { readImage } from "./readImage";
 import { useAppStore } from "../../libs/appStore";
 import PageView from "./components/PageView";
@@ -23,25 +23,13 @@ import PopOverContent from "../SettingScreen/PopOverContent";
 // classic report (your own header/footer images), folded in here so there's
 // only one place to set up how reports look.
 const UPLOAD_DESIGN = "uploadHeaderFooter";
-// Free-plan accounts can use the plain "Simple" design and the header/footer
-// upload option; every other design needs a subscription.
-const FREE_DESIGNS = new Set(["minimal", UPLOAD_DESIGN]);
+// The only option that ships with the app, so it works with no download. Every
+// other design comes from the server's template catalog, where each entry says
+// whether it is free or needs a paid/subscription plan.
 // Only "modernPurple" ("Modern") mirrors — logo/name/DNA accent/wave all
 // move to the right. Every other design (including "minimal", which has
 // its own fixed logo-left/name-right layout in presets.js) is untouched.
 const mirrorFor = (design) => design === "modernPurple";
-
-// The Dr. Lab logo/wordmark ship as bundled asset URLs; templates embed
-// images as data URLs (they must print without the app's asset server), so
-// convert once.
-async function assetToDataUrl(url, name) {
-  const blob = await (await fetch(url)).blob();
-  return readImage(new File([blob], name, { type: blob.type || "image/png" }));
-}
-const drLabLogoDataUrl = () => assetToDataUrl(drLabLogo, "drlab.png");
-// The free-plan co-brand badge uses the wordmark (name + logo side by side),
-// not the square icon used when a lab picks Dr. Lab as their own logo.
-const drLabBadgeDataUrl = () => assetToDataUrl(drLabBadge, "drlab-badge.png");
 
 function LogoTile({ selected, onClick, children, label, locked }) {
   const { token } = theme.useToken();
@@ -95,7 +83,7 @@ function LogoTile({ selected, onClick, children, label, locked }) {
   );
 }
 
-function DesignCard({ design, settings, selected, onClick, label, mirror, freeBadge, drLabBadgeData, drLabLogoData, locked, busy, downloaded, onDelete }) {
+function DesignCard({ design, settings, selected, onClick, label, mirror, freeBadge, drLabBadgeData, drLabLogoData, locked, paid, busy }) {
   const { token } = theme.useToken();
   const { t: tr } = useTranslation();
   const t = useMemo(
@@ -108,16 +96,29 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
     <button
       type="button"
       onClick={locked ? undefined : onClick}
-      className="sd-design"
+      // A locked design must not read as clickable: no hover lift (see
+      // .sd-locked), a dimmed preview, a lock on the label, not-allowed cursor.
+      className={locked ? "sd-design sd-locked" : "sd-design"}
+      aria-disabled={locked || undefined}
       style={{
-        borderColor: selected ? token.colorPrimary : token.colorBorderSecondary,
+        borderColor: selected ? token.colorPrimary : paid ? "transparent" : token.colorBorderSecondary,
         boxShadow: selected ? `0 0 0 3px ${token.colorPrimaryBg}` : "none",
-        background: token.colorBgContainer,
+        // Paid, not selected: a thin metallic gold border (gradient border-box).
+        background:
+          paid && !selected
+            ? `linear-gradient(${token.colorBgContainer}, ${token.colorBgContainer}) padding-box, linear-gradient(135deg, #F3DDA0, #BF9640 52%, #F3DDA0) border-box`
+            : token.colorBgContainer,
         cursor: locked ? "not-allowed" : "pointer",
         position: "relative",
       }}
     >
-      <div style={{ position: "relative" }}>
+      {paid && (
+        <span className="sd-pro">
+          {locked && <LockFilled style={{ fontSize: 9, marginInlineEnd: 4 }} />}
+          {tr("SD_Premium")}
+        </span>
+      )}
+      <div style={{ position: "relative", opacity: locked ? 0.5 : 1, filter: locked ? "grayscale(0.4)" : undefined }}>
         <PageView html={html} widthMm={size.width} heightMm={size.height} width={104} shadow={false} style={{ border: "1px solid #eee" }} />
         {busy && (
           <div
@@ -134,47 +135,11 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
             <LoadingOutlined style={{ fontSize: 26, color: token.colorPrimary }} />
           </div>
         )}
-        {downloaded && !busy && (
-          <span
-            title={tr("SD_Downloaded")}
-            style={{
-              position: "absolute",
-              top: 6,
-              left: 6,
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: token.colorSuccess,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-            }}
-          >
-            <CheckOutlined style={{ fontSize: 11, color: "#FFFFFF" }} />
-          </span>
-        )}
-        {locked && (
-          <div
-            style={{
-              position: "absolute",
-              top: 6,
-              right: 6,
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#F5A623",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-            }}
-          >
-            <CrownOutlined style={{ fontSize: 12, color: "#FFFFFF" }} />
-          </div>
-        )}
       </div>
-      <div className="sd-design-label" style={{ color: selected ? token.colorPrimary : token.colorText }}>
+      <div
+        className="sd-design-label"
+        style={{ color: selected ? token.colorPrimary : locked ? token.colorTextSecondary : token.colorText }}
+      >
         {selected && <CheckOutlined />} {label}
       </div>
     </button>
@@ -189,39 +154,7 @@ function DesignCard({ design, settings, selected, onClick, label, mirror, freeBa
       </Popover>
     );
   }
-  if (!(downloaded && !busy && onDelete)) return card;
-  // The delete control is a sibling of the tile, not a child: the confirm
-  // popup is a React child of whatever renders it, so inside the tile's
-  // <button> its clicks would bubble up as a click on the tile itself
-  // (re-selecting and re-downloading the design it just removed).
-  return (
-    <div style={{ position: "relative", display: "flex" }}>
-      {React.cloneElement(card, { style: { ...card.props.style, width: "100%" } })}
-      <Popconfirm title={tr("SD_DeleteDownload")} okText={tr("SD_Remove")} okButtonProps={{ danger: true }} onConfirm={onDelete}>
-        <button
-          type="button"
-          title={tr("SD_Remove")}
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#FFFFFF",
-            border: `1px solid ${token.colorBorderSecondary}`,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-            cursor: "pointer",
-          }}
-        >
-          <DeleteOutlined style={{ fontSize: 12, color: token.colorError }} />
-        </button>
-      </Popconfirm>
-    </div>
-  );
+  return card;
 }
 
 // The upload tile can't render a live schema preview — it just shows a
@@ -263,9 +196,11 @@ function UploadDesignCard({ selected, onClick, label }) {
   );
 }
 
-export default function SimpleDesigner({ activeKind, onActivated }) {
+// noSelection: opened from the "choose a design" prompt — nothing is selected
+// and the lab has to pick a design before it can continue.
+export default function SimpleDesigner({ activeKind, onActivated, noSelection = false }) {
   const { token } = theme.useToken();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { planType } = usePlan();
   // freeBadge still gates the free-plan UI restrictions below (locked paid
   // designs/logos/colors). The Dr. Lab co-brand badge itself now shows on
@@ -291,7 +226,6 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   // Designs published from the admin dashboard (empty when none/offline).
   const [catalog, setCatalog] = useState([]);
   const [downloading, setDownloading] = useState(null);
-  const [downloadedIds, setDownloadedIds] = useState(new Set());
   const [settings, setSettings] = useState(null);
   // Mirror the header layout (logo on the right, name following it) on
   // every design — virtually every lab name typed in is Arabic, so this is
@@ -321,8 +255,8 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
       // No default template at all means the classic header/footer theme is
       // what's actually printing — start on that tile instead of a design,
       // even when an older saved design exists (it's just not the active one).
-      const base = simple ? simple.content.simple : defaultSimpleSettings(getAccountLab());
-      setSettings(!def ? { ...base, design: UPLOAD_DESIGN } : base);
+      const base = simple ? simple.content.simple : { ...defaultSimpleSettings(getAccountLab()), design: UPLOAD_DESIGN };
+      setSettings(noSelection ? { ...base, design: "", catalog: undefined } : !def ? { ...base, design: UPLOAD_DESIGN } : base);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,32 +280,9 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
             ? { ...cur, catalog: e.configJson, catalogVersion: e.version }
             : cur;
         });
-        refreshDownloaded();
       })
       .catch(() => {});
-    refreshDownloaded();
   }, []);
-
-  const refreshDownloaded = () =>
-    listCachedCatalog()
-      .then((l) => setDownloadedIds(new Set(l.map((c) => c.id))))
-      .catch(() => {});
-
-  // Removes the local download and its tile from the list. A design already
-  // saved as the lab's report design keeps printing from its own embedded
-  // copy. It comes back in the list the next time the screen loads online.
-  const removeCatalog = async (entry) => {
-    try {
-      await deleteCatalogTemplate(entry.id);
-      setCatalog((list) => list.filter((c) => c.id !== entry.id));
-      // If it was the picked design, fall back to the plain one instead of
-      // leaving a selection that no longer has a tile.
-      if (settings?.design === `catalog:${entry.id}`) set({ design: "minimal", catalog: undefined });
-      await refreshDownloaded();
-    } catch (e) {
-      message.error(t("SD_Error"));
-    }
-  };
 
   // Picking a catalog design downloads it into the local database first, so
   // it keeps working (and listing) offline, then makes it the selected design.
@@ -380,7 +291,6 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     try {
       await downloadCatalogTemplate(entry);
       set({ design: `catalog:${entry.id}`, catalog: entry.configJson, catalogVersion: entry.version });
-      await refreshDownloaded();
     } catch (e) {
       message.error(t("SD_Error"));
     } finally {
@@ -429,7 +339,8 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
   const isUploadDesign = settings.design === UPLOAD_DESIGN;
   // "Simple" always shows the Dr. Lab logo (see buildSimpleTemplate) — the
   // logo picker doesn't apply to it.
-  const isMinimal = settings.design === "minimal";
+  const isMinimal = forcesDrLabLogo(settings);
+
 
   // Persists a header/footer size choice the same way PDFPreviewCard's own
   // controls do, so this screen and the Settings screen never disagree.
@@ -469,6 +380,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
       setExisting(saved);
       setCustomDefault(null);
       setDirty(false);
+      markDesignChosen();
       message.success(t("SD_Saved"));
       onActivated?.();
     } catch (e) {
@@ -485,6 +397,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     setSaving(true);
     try {
       await setDefaultTemplate(null);
+      markDesignChosen();
       setDirty(false);
       message.success(t("TH_Saved"));
       onActivated?.();
@@ -513,49 +426,29 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     </label>
   );
 
+  // Free designs first, then the dashboard's order.
+  const sortedCatalog = [...catalog].sort(
+    (a, b) => Number(!!b.isFree) - Number(!!a.isFree) || (a.sortOrder || 0) - (b.sortOrder || 0) || a.id - b.id
+  );
+  // The old built-in designs keep their translated names; anything added
+  // later shows the name it was given in the dashboard.
+  const catalogLabel = (c) =>
+    c.legacyKey && i18n.exists(`SD_D_${c.legacyKey}`) ? t(`SD_D_${c.legacyKey}`) : c.name;
+
   const steps = [
     {
       title: t("SD_Step1"),
       hint: t("SD_Hint1"),
       content: (
         <div className="sd-designs">
-          {/* Free tiles first: the plain design, then the pre-printed-paper
-              option, then every paid design after. */}
-          {SIMPLE_DESIGNS.filter((d) => FREE_DESIGNS.has(d)).map((d) => (
-            <DesignCard
-              key={d}
-              design={d}
-              settings={settings}
-              mirror={mirrorFor(d)}
-              freeBadge={showDrLabBadge}
-              drLabBadgeData={drLabBadgeData}
-              drLabLogoData={drLabLogoData}
-              selected={settings.design === d}
-              onClick={() => set({ design: d, catalog: undefined })}
-              label={t(`SD_D_${d}`)}
-            />
-          ))}
+          {/* Local, always available: the pre-printed paper option. Everything
+              after it comes from the catalog. */}
           <UploadDesignCard
             selected={isUploadDesign}
             onClick={() => set({ design: UPLOAD_DESIGN, catalog: undefined })}
             label={t("SD_D_uploadHeaderFooter")}
           />
-          {SIMPLE_DESIGNS.filter((d) => !FREE_DESIGNS.has(d)).map((d) => (
-            <DesignCard
-              key={d}
-              design={d}
-              settings={settings}
-              mirror={mirrorFor(d)}
-              freeBadge={showDrLabBadge}
-              drLabBadgeData={drLabBadgeData}
-              drLabLogoData={drLabLogoData}
-              selected={settings.design === d}
-              onClick={() => set({ design: d, catalog: undefined })}
-              label={t(`SD_D_${d}`)}
-              locked={freeBadge}
-            />
-          ))}
-          {catalog.map((c) => (
+          {sortedCatalog.map((c) => (
             <DesignCard
               key={`catalog:${c.id}`}
               design={`catalog:${c.id}`}
@@ -566,11 +459,12 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
               drLabLogoData={drLabLogoData}
               selected={settings.design === `catalog:${c.id}`}
               onClick={() => (downloading ? null : pickCatalog(c))}
-              label={c.name}
-              locked={freeBadge}
+              label={catalogLabel(c)}
+              locked={freeBadge && !c.isFree}
+              // The premium look only shows to free labs, as the cue for what
+              // an upgrade unlocks; paid/subscription labs see plain tiles.
+              paid={freeBadge && !c.isFree}
               busy={downloading === c.id}
-              downloaded={downloadedIds.has(c.id)}
-              onDelete={() => removeCatalog(c)}
             />
           ))}
         </div>
@@ -715,12 +609,15 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
     <StepWizard
       steps={steps}
       current={step}
-      onChange={setStep}
+      // Nothing picked yet: stay on step one.
+      onChange={(n) => (!settings.design && n > 0 ? null : setStep(n))}
+      nextDisabled={!settings.design}
       finish={
         <Button
           type="primary"
           size="large"
           loading={saving}
+          disabled={!settings.design}
           onClick={isUploadDesign ? useTheme : save}
           icon={<CheckOutlined />}
           className="sd-save"
@@ -729,6 +626,11 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
         </Button>
       }
       preview={
+        !settings.design ? (
+          <div className="sd-status" style={{ color: token.colorTextSecondary, padding: "80px 16px", textAlign: "center" }}>
+            {t("DG_PickPreview")}
+          </div>
+        ) : (
         <>
           <div className="sd-status" style={{ color: inUse ? token.colorSuccess : token.colorTextSecondary }}>
             {inUse ? `✓ ${t(isUploadDesign ? "TH_InUse" : "SD_InUse")}` : t(isUploadDesign ? "TH_NotInUse" : "SD_NotInUse")}
@@ -739,6 +641,7 @@ export default function SimpleDesigner({ activeKind, onActivated }) {
             <PageView html={previewHtml} widthMm={size.width} heightMm={size.height} width={360} />
           )}
         </>
+        )
       }
     />
   );

@@ -697,13 +697,12 @@ ipcMain.on("asynchronous-message", async (event, arg) => {
 
     // Designs downloaded from the server's template catalog (see db.js).
     case "getCatalogTemplates":
-    case "saveCatalogTemplate":
-    case "deleteCatalogTemplate": {
+    case "saveCatalogTemplate": {
       try {
-        let resp;
-        if (arg.query === "getCatalogTemplates") resp = labDB.getCatalogTemplates();
-        else if (arg.query === "saveCatalogTemplate") resp = labDB.saveCatalogTemplate(arg.data);
-        else resp = labDB.deleteCatalogTemplate(arg.id);
+        const resp =
+          arg.query === "getCatalogTemplates"
+            ? labDB.getCatalogTemplates()
+            : labDB.saveCatalogTemplate(arg.data);
         event.reply(`asynchronous-reply-${arg.query}`, resp);
       } catch (error) {
         log.error(`[TEMPLATE_ERROR] ${arg.query}:`, error.message);

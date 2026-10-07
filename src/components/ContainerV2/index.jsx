@@ -30,6 +30,7 @@ import lightLogo from "../../assets/light-logo.png";
 import darkLogoName from "../../assets/dark-name.png";
 import lightLogoName from "../../assets/light-name.png";
 import { useNavigate, useLocation } from "react-router-dom";
+import DesignGateModal from "../DesignGateModal";
 import PopOverContent from "../../screens/SettingScreen/PopOverContent";
 import { usePlan } from "../../hooks/usePlan";
 import dayjs from "dayjs";
@@ -357,6 +358,7 @@ const MainContainerV2 = ({ children }) => {
         )}
         {children}
       </Content>
+      <DesignGateModal />
       <Modal
         open={isSubscriptionWarning()}
         closable={false}

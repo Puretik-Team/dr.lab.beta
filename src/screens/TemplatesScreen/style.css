@@ -49,6 +49,31 @@
 .sd-design:hover {
   transform: translateY(-2px);
 }
+/* Locked (needs an upgrade): stays put on hover, since it can't be picked. */
+.sd-design.sd-locked:hover {
+  transform: none;
+}
+/* Paid designs: a small champagne label straddling the tile's top edge. Text
+   (not just color) says what it is, and it never wraps. */
+.sd-pro {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  color: #4a3200;
+  background: linear-gradient(135deg, #f8e7b0, #d9b65a 55%, #f2d88f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  z-index: 2;
+}
 .sd-design-label {
   font-weight: 700;
   font-size: 14px;

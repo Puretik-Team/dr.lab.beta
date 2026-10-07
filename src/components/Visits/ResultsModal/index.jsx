@@ -18,6 +18,7 @@ import { formatRefText } from "../../../helper/refTextFormatter";
 import { PrinterOutlined, SaveOutlined } from "@ant-design/icons";
 import { send } from "../../../control/renderer";
 import { usePlan } from "../../../hooks/usePlan";
+import { ensureReportDesign } from "../../../screens/TemplatesScreen/designGate";
 import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
@@ -88,6 +89,7 @@ export function ResultsModal({ open, visit, onCancel, onSubmit }) {
   };
 
   const handlPrint = async (withQR = false) => {
+    if (!(await ensureReportDesign(planType))) return;
     try {
       // Get print settings from localStorage or use defaults
       const fontSize =

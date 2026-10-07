@@ -31,7 +31,6 @@ export function send(doc) {
         "setDefaultReportTemplate",
         "getCatalogTemplates",
         "saveCatalogTemplate",
-        "deleteCatalogTemplate",
         "exportReportTemplatePDF",
         "renderThemePreview",
         "renderReportPreview",

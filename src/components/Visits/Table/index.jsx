@@ -33,6 +33,7 @@ import { useAppTheme } from "../../../hooks/useAppThem";
 import { BarcodeModal } from "../BarcodeModal/barcodeModal";
 import { apiCall } from "../../../libs/api";
 import { usePlan } from "../../../hooks/usePlan";
+import { ensureReportDesign } from "../../../screens/TemplatesScreen/designGate";
 // import { sendWhatsApp } from "../../../helper/whatsapp";
 
 export const PureTable = ({
@@ -121,6 +122,7 @@ export const PureTable = ({
   };
 
   const handleSandWhatsap = async (record) => {
+    if (!(await ensureReportDesign(planType))) return;
     setMsgLoading(true);
     console.log(record);
     try {

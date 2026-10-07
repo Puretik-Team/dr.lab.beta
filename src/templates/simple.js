@@ -15,10 +15,10 @@ const SIMPLE_COLORS = [
   { id: "red", hex: "#A61E4D" },
 ];
 
-const SIMPLE_DESIGNS = [
-  "modernPurple", "gradient", "split", "science", "soft", "ribbon",
-  "elegant", "minimal", "corporate", "headerFooter",
-];
+// No design ships with the app: every one comes from the server's template
+// catalog (see TemplatesScreen/api.js) and is downloaded to the local database.
+// buildPreset still knows the old design keys, so a lab that saved one before
+// the move keeps printing and reopening it.
 
 // Ready-made logos for labs without one: a library illustration inside a
 // round badge, drawn in the report's color. Stored in settings as
@@ -79,7 +79,7 @@ function recolor(elements, hex) {
 
 function defaultSimpleSettings(accountLab = {}) {
   return {
-    design: "modernPurple",
+    design: "",
     color: SIMPLE_COLORS[0].hex,
     logo: "",
     lab: {
@@ -99,15 +99,22 @@ function defaultSimpleSettings(accountLab = {}) {
 // the color picked in the wizard, like the built-in designs.
 const isCatalogDesign = (settings) => String(settings.design || "").startsWith("catalog:") && !!settings.catalog;
 
+// "Simple" always carries the Dr. Lab logo, whatever the lab picked. The old
+// built-in design is keyed "minimal"; its catalog copy says so with a flag in
+// its content, since the app (not the JSON) holds the logo image.
+const forcesDrLabLogo = (settings) =>
+  settings?.design === "minimal" || (isCatalogDesign(settings) && !!settings.catalog?.content?.forceDrLabLogo);
+
 function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadge = false, drLabBadgeSrc = "", drLabLogoSrc = "") {
   const catalog = isCatalogDesign(settings) ? normalizeTemplate(settings.catalog) : null;
   const t = createTemplate({
     name: existing?.name || catalog?.name || "My report design",
     description: catalog ? "Downloaded design" : "Made with the simple report designer",
-    ...(catalog ? { page: catalog.page } : {}),
-    // Labels are always English; the data filled in (names, notes) is often
-    // Arabic, which the engine lays out with per-value text direction.
+    // Labels are English unless a catalog design says otherwise; the data
+    // filled in (names, notes) is often Arabic, which the engine lays out
+    // with per-value text direction.
     language: "en",
+    ...(catalog ? { page: catalog.page, language: catalog.language } : {}),
     isDefault: true,
   });
   // The header/footer layout mirrors (logo on the right, name following it)
@@ -119,7 +126,7 @@ function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadg
   if (catalog) t.content.watermarkText = catalog.content?.watermarkText || "";
   // "Simple" always shows the Dr. Lab logo, regardless of what the lab
   // picked — the logo choice step has no effect on this design.
-  const forceDrLabLogo = settings.design === "minimal" && !!drLabLogoSrc;
+  const forceDrLabLogo = forcesDrLabLogo(settings) && !!drLabLogoSrc;
   const logo = forceDrLabLogo ? drLabLogoSrc : resolveLogo(settings.logo, settings.color);
   if (logo) {
     els = els.map((e) => (e.role === "logo" ? { ...e, src: logo } : e));
@@ -146,4 +153,4 @@ function buildSimpleTemplate(settings, existing = null, mirror = false, freeBadg
   };
 }
 
-module.exports = { isCatalogDesign, SIMPLE_COLORS, SIMPLE_DESIGNS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo };
+module.exports = { isCatalogDesign, forcesDrLabLogo, SIMPLE_COLORS, LOGO_ICONS, buildSimpleTemplate, defaultSimpleSettings, resolveLogo };

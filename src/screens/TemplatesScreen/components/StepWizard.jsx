@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 // One step at a time with big Back / Next buttons and a preview that stays
 // visible on the side — the layout both Report Design tabs share.
-export default function StepWizard({ steps, current, onChange, preview, finish }) {
+export default function StepWizard({ steps, current, onChange, preview, finish, nextDisabled = false }) {
   const { token } = theme.useToken();
   const { t } = useTranslation();
   const last = current === steps.length - 1;
@@ -33,7 +33,7 @@ export default function StepWizard({ steps, current, onChange, preview, finish }
           {last ? (
             finish
           ) : (
-            <Button type="primary" size="large" onClick={() => onChange(current + 1)} className="sw-btn">
+            <Button type="primary" size="large" disabled={nextDisabled} onClick={() => onChange(current + 1)} className="sw-btn">
               {t("SW_Next")}
             </Button>
           )}
